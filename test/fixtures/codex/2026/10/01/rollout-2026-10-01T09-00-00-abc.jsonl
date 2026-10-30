@@ -1,0 +1,8 @@
+{"timestamp":"2026-10-01T09:00:00Z","type":"session_meta","payload":{"id":"c1","cwd":"/home/test/api","originator":"codex_cli_rs"}}
+{"timestamp":"2026-10-01T09:00:01Z","type":"turn_context","payload":{"cwd":"/home/test/api","approval_policy":"on-request","sandbox_policy":{"mode":"workspace-write"}}}
+{"timestamp":"2026-10-01T09:00:02Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"uv sync && pytest -q\"],\"workdir\":\"/home/test/api\"}","call_id":"call_1"}}
+{"timestamp":"2026-10-01T09:00:05Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"{\"output\":\"3 passed\",\"metadata\":{\"exit_code\":0}}"}}
+{"timestamp":"2026-10-01T09:01:00Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","call_id":"call_2","input":"*** Begin Patch\n*** Update File: app/main.py\n@@\n-a\n+b\n*** End Patch"}}
+{"timestamp":"2026-10-01T09:02:00Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"curl -sS https://api.openai.com/v1/models -o /home/test/api/models.json\"],\"workdir\":\"/home/test/api\"}","call_id":"call_3"}}
+{"timestamp":"2026-10-01T09:02:01Z","type":"event_msg","payload":{"type":"exec_approval_request","call_id":"call_3"}}
+{"timestamp":"2026-10-01T09:02:02Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_3","output":"{\"output\":\"\",\"metadata\":{\"exit_code\":0}}"}}
