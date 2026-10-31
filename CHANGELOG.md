@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-10-31)
 
 ### Added
 - `sandfit explain [filter]`: why each rule is in the policy, how often it was needed, one example.
