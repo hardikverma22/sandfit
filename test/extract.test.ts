@@ -135,3 +135,26 @@ describe("analyze: runners, modules, HTTP clients and copies", () => {
     expect(needsOf("rsync -a dist/ /backup/")).not.toContain("exec:rsync");
   });
 });
+
+describe("secret environment variables", () => {
+  const envNeeds = (command: string) =>
+    analyze([bash(command)], { home, readGitRemotes: false })[0]!.needs.filter((n) => n.kind === "env").map((n) => `${n.value}->${n.hosts?.join(",")}`);
+
+  it("records where a secret variable is sent, by name only", () => {
+    expect(envNeeds('curl -H "Authorization: Bearer $OPENAI_API_KEY" https://api.openai.com/v1/models')).toEqual(["OPENAI_API_KEY->api.openai.com"]);
+    expect(envNeeds("curl -u me:${GITHUB_TOKEN} https://api.github.com/user && curl https://uploads.github.com/x -H \"x: $GITHUB_TOKEN\"")).toEqual([
+      "GITHUB_TOKEN->api.github.com,uploads.github.com",
+    ]);
+  });
+
+  it("ignores variables that are not secret-looking or never leave the machine", () => {
+    expect(envNeeds("echo $PATH $HOME $NODE_ENV && curl https://x.dev")).toEqual([]);
+    expect(envNeeds('echo "$DB_PASSWORD" > .env.local')).toEqual([]);
+  });
+
+  it("knows the token variables of common tools", () => {
+    expect(envNeeds("npm publish")).toEqual(["NPM_TOKEN->registry.npmjs.org", "NODE_AUTH_TOKEN->registry.npmjs.org"]);
+    expect(envNeeds("npm test")).toEqual([]);
+    expect(envNeeds("vercel --prod")).toContain("VERCEL_TOKEN->api.vercel.com,vercel.com");
+  });
+});

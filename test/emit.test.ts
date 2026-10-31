@@ -30,8 +30,8 @@ function policy(over: Partial<Policy> = {}): Policy {
 describe("Claude Code settings", () => {
   const s = toClaudeSettings(policy()) as any;
 
-  it("turns the sandbox on without allowing an escape hatch", () => {
-    expect(s.sandbox).toMatchObject({ enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false, excludedCommands: ["docker *"] });
+  it("turns the sandbox on without allowing an escape hatch, and refuses to run unsandboxed", () => {
+    expect(s.sandbox).toMatchObject({ enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false, excludedCommands: ["docker *"] });
     expect(s.sandbox.network).toEqual({ allowedDomains: ["registry.npmjs.org"], allowLocalBinding: true, allowUnixSockets: ["/tmp/x.sock"] });
   });
 
@@ -41,6 +41,12 @@ describe("Claude Code settings", () => {
     );
     const withPerms = toClaudeSettings(policy({ harnessTools: { allowWrite: ["/abs/dir"], allowFetch: [] } }), { withPermissions: true }) as any;
     expect(withPerms.permissions.allow).toEqual(["Edit(//abs/dir/**)", "mcp__github__create_issue"]);
+  });
+
+  it("strict network mode is only written to user settings, where Claude Code honours it", () => {
+    expect(s.sandbox.network.strictAllowlist).toBeUndefined();
+    expect((toClaudeSettings(policy(), { user: true, strictNetwork: true }) as any).sandbox.network.strictAllowlist).toBe(true);
+    expect(() => toClaudeSettings(policy(), { strictNetwork: true })).toThrow("user settings");
   });
 
   it("only adds harness-tool grants to the OS sandbox config when asked", () => {
@@ -98,5 +104,31 @@ describe("mergeSettings", () => {
     const gen = toClaudeSettings(policy());
     const once = mergeSettings({ model: "x" }, gen);
     expect(mergeSettings(once, gen)).toEqual(once);
+  });
+});
+
+describe("credential masking", () => {
+  const masked = () => policy({ maskEnv: [{ name: "OPENAI_API_KEY", hosts: ["api.openai.com"] }], network: { ...policy().network, allowDomains: ["registry.npmjs.org", "api.openai.com"] } });
+
+  it("masks secret variables for user settings, with TLS termination the proxy needs", () => {
+    const s = toClaudeSettings(masked(), { user: true, maskCredentials: true }) as any;
+    expect(s.sandbox.network.tlsTerminate).toEqual({});
+    // The shape documented at code.claude.com/docs/en/sandboxing#mask-credentials.
+    expect(s.sandbox.credentials).toEqual({ envVars: [{ name: "OPENAI_API_KEY", mode: "mask", injectHosts: ["api.openai.com"] }] });
+  });
+
+  it("is off unless asked, refused for project settings, and adds nothing when there is nothing to mask", () => {
+    expect((toClaudeSettings(masked()) as any).sandbox.credentials).toBeUndefined();
+    expect(() => toClaudeSettings(masked(), { maskCredentials: true })).toThrow("user settings");
+    const none = toClaudeSettings(policy(), { user: true, maskCredentials: true }) as any;
+    expect(none.sandbox.credentials).toBeUndefined();
+    expect(none.sandbox.network.tlsTerminate).toBeUndefined();
+  });
+
+  it("re-applying does not duplicate credential entries", () => {
+    const gen = toClaudeSettings(masked(), { user: true, maskCredentials: true });
+    const once = mergeSettings({}, gen);
+    expect(mergeSettings(once, gen)).toEqual(once);
+    expect((mergeSettings(once, gen) as any).sandbox.credentials.envVars).toHaveLength(1);
   });
 });

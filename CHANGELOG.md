@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `--strict-network` (Claude Code, with `--user`): writes `sandbox.network.strictAllowlist`, so hosts
+  outside the allowlist are refused instead of prompting. Needs Claude Code v2.1.219 or later. Claude
+  Code only honours it in user or managed settings, so sandfit refuses it for project settings
+  rather than writing a setting that would do nothing.
+- `--mask-credentials` (Claude Code, with `--user`): masks the secret environment variables your
+  history sent to specific hosts (a `$OPENAI_API_KEY` in a `curl`, `NPM_TOKEN` for npm, tokens of
+  Vercel, Netlify, Cloudflare, Supabase, Fly, Stripe and Hugging Face CLIs). Sandboxed commands see a
+  placeholder; Claude Code's proxy restores the real value only for those hosts. Writes
+  `sandbox.credentials.envVars` (mode `mask`, `injectHosts`) and the experimental
+  `sandbox.network.tlsTerminate`. Only variable names are recorded, never values. Variables used
+  only locally are not masked.
+- `sandfit explain env` shows each secret variable and the hosts it was sent to.
+
+### Changed
+- Claude Code settings now include `sandbox.failIfUnavailable: true`. Without it, Claude Code runs
+  commands unsandboxed when the sandbox cannot start, so a broken setup silently means no sandbox.
+  Your own value is kept if you already set one.
+- `diff` shows settings whose value is an empty object (like `tlsTerminate: {}`).
+
+### Fixed
+- Re-applying no longer duplicates list entries that are objects (such as credential entries).
+
 ## 0.3.1 (2026-10-31)
 
 ### Changed

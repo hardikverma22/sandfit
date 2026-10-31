@@ -31,11 +31,25 @@ describe("emitted configs match the tools' published schemas", () => {
   it("Claude Code settings", async () => {
     const validate = validator(schema("claude-code-settings.json"));
     const p = await policy();
-    for (const settings of [toClaudeSettings(p), toClaudeSettings(p, { withPermissions: true })]) {
+    for (const settings of [toClaudeSettings(p), toClaudeSettings(p, { withPermissions: true }), toClaudeSettings(p, { user: true, strictNetwork: true })]) {
       const ok = validate(settings);
       expect(validate.errors ?? []).toEqual([]);
       expect(ok).toBe(true);
     }
+  });
+
+  it("Claude Code settings with credential masking (everything except the mask entries themselves)", async () => {
+    // SchemaStore's schema still lists only mode "deny" for credentials, while Claude Code's docs
+    // document mode "mask" (code.claude.com/docs/en/sandboxing#mask-credentials). Validate the rest
+    // of the config here; test/emit.test.ts checks the mask entries against the documented shape.
+    const validate = validator(schema("claude-code-settings.json"));
+    const p = { ...(await policy()), maskEnv: [{ name: "OPENAI_API_KEY", hosts: ["registry.npmjs.org"] }] };
+    const settings = toClaudeSettings(p, { user: true, maskCredentials: true }) as any;
+    expect(settings.sandbox.credentials.envVars[0].mode).toBe("mask");
+    delete settings.sandbox.credentials;
+    const ok = validate(settings);
+    expect(validate.errors ?? []).toEqual([]);
+    expect(ok).toBe(true);
   });
 
   it("nono profile", async () => {

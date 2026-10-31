@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { SECRET_PROJECT_GLOBS, SELF_PROTECT_PATHS } from "../extract/knowledge.js";
 import type { AnalyzedEvent, Harness, Policy } from "../types.js";
+import { domainAllowed } from "../forecast.js";
 import { redact } from "../redact.js";
 import { VERSION } from "../version.js";
 import { dropSubsumed, generalizeHosts, generalizeWrite, gitRoot, isSecret, isSelfProtected, secretPaths, tildify, tooBroad } from "./paths.js";
@@ -81,6 +82,7 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
   const mcp = new Set<string>();
   let bind = false;
   const neededSecrets = new Map<string, string>();
+  const envHosts = new Map<string, Set<string>>();
 
   for (const a of analyzed) {
     const example = a.event.command ?? a.event.url ?? a.event.paths?.join(" ") ?? a.event.toolName;
@@ -113,6 +115,13 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
         case "read":
           if (n.inferred && isSecret(n.value, home)) neededSecrets.set(tildify(n.value, home), n.reason);
           break;
+        case "env": {
+          const set = envHosts.get(n.value) ?? new Set<string>();
+          for (const h of n.hosts ?? []) set.add(h);
+          envHosts.set(n.value, set);
+          note(`env:${n.value}`, example);
+          break;
+        }
         case "mcp":
           mcp.add(n.value);
           note(`mcp:${n.value}`, example);
@@ -128,6 +137,15 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
 
   // Sockets of excluded programs are not granted: those programs run outside the sandbox.
   const excludedSockets = new Set(excluded.has("docker") ? ["/var/run/docker.sock"] : []);
+
+  // A masked credential may only be released to hosts the sandbox lets commands reach
+  // (Claude Code requires each injectHosts entry to be admitted by allowedDomains).
+  const allowDomains = generalizeHosts(shellHosts.filter(hostKeep));
+  const maskEnv = [...envHosts]
+    .filter(([name]) => (evidence[`env:${name}`]?.count ?? 0) >= minCount)
+    .map(([name, hosts]) => ({ name, hosts: [...hosts].filter((h) => domainAllowed(h, allowDomains)).sort() }))
+    .filter((e) => e.hosts.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const times = analyzed.map((a) => a.event.timestamp).filter(Boolean).sort();
   const harnesses = [...new Set(analyzed.map((a) => a.event.harness))] as Harness[];
@@ -154,7 +172,7 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
       denyWrite: SELF_PROTECT_PATHS.map((p) => (p.startsWith("~") ? p : `./${p}`)),
     },
     network: {
-      allowDomains: generalizeHosts(shellHosts.filter(hostKeep)),
+      allowDomains,
       denyDomains: [],
       allowLocalBinding: bind,
       allowUnixSockets: [...sockets].filter((s) => !excludedSockets.has(s)).sort(),
@@ -166,6 +184,7 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
       allowWrite: dropSubsumed([...toolWrites].filter((w) => !shellWrites.has(w)).filter(keep("write"))),
       allowFetch: generalizeHosts(toolHosts.filter(hostKeep)),
     },
+    ...(maskEnv.length ? { maskEnv } : {}),
     evidence,
   };
 }

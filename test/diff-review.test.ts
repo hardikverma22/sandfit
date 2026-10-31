@@ -24,6 +24,10 @@ describe("diffConfig", () => {
     expect(diffConfig({ old: 1, keep: 2 }, { keep: 2 })).toEqual([{ path: "old", kind: "remove", value: "1" }]);
   });
 
+  it("shows a new empty-object setting such as tlsTerminate: {}", () => {
+    expect(diffConfig({ sandbox: { network: {} } }, { sandbox: { network: { tlsTerminate: {} } } })).toEqual([{ path: "sandbox.network.tlsTerminate", kind: "set", value: "{}", from: "unset" }]);
+  });
+
   it("is empty when nothing changes", () => {
     const cfg = { sandbox: { enabled: true, network: { allowedDomains: ["a.com", "b.com"] } }, permissions: { deny: ["Read(~/.ssh/**)"] } };
     expect(diffConfig(cfg, structuredClone(cfg))).toEqual([]);

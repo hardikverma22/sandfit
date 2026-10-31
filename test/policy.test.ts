@@ -118,6 +118,18 @@ describe("buildPolicy", () => {
     rmSync(join(home, ".npmrc"));
   });
 
+  it("masks a secret variable only towards hosts the policy allows", () => {
+    const p = build(['curl -H "Authorization: Bearer $OPENAI_API_KEY" https://api.openai.com/v1/x', "npm publish"]);
+    expect(p.maskEnv).toEqual([
+      { name: "NODE_AUTH_TOKEN", hosts: ["registry.npmjs.org"] },
+      { name: "NPM_TOKEN", hosts: ["registry.npmjs.org"] },
+      { name: "OPENAI_API_KEY", hosts: ["api.openai.com"] },
+    ]);
+    // Below --min-count the host is not allowed, so the variable is not masked towards it either.
+    expect(build(['curl -H "x: $OPENAI_API_KEY" https://api.openai.com/v1/x'], { minCount: 2 }).maskEnv).toBeUndefined();
+    expect(JSON.stringify(build(["OPENAI_API_KEY=sk-live-abcdefghijklmnop1234 curl https://api.openai.com"]))).not.toContain("sk-live-abcdefghijklmnop1234");
+  });
+
   it("records evidence with credentials redacted", () => {
     const p = build(["curl -H 'Authorization: Bearer sk-live-abcdefghijklmnop1234' https://api.stripe.com/v1/charges"]);
     expect(p.evidence["net:api.stripe.com"]?.count).toBe(1);

@@ -104,6 +104,26 @@ describe("option checking", () => {
     expect(r.err).toContain(flag);
   });
 
+  it("rejects --strict-network where Claude Code would ignore it", () => {
+    const project = sandfit(["emit", "--strict-network"]);
+    expect(project.code).toBe(1);
+    expect(project.err).toContain("--user");
+    expect(sandfit(["emit", "-t", "srt", "--strict-network"]).code).toBe(1);
+    expect(sandfit(["diff", "-t", "codex", "--strict-network"]).code).toBe(1);
+    const user = JSON.parse(sandfit(["emit", "--user", "--strict-network"]).out);
+    expect(user.sandbox.network.strictAllowlist).toBe(true);
+  });
+
+  it("--mask-credentials writes masks only to user settings", () => {
+    expect(sandfit(["emit", "--mask-credentials"]).err).toContain("--user");
+    expect(sandfit(["diff", "-t", "srt", "--mask-credentials"]).code).toBe(1);
+    const s = JSON.parse(sandfit(["emit", "--user", "--mask-credentials"]).out);
+    expect(s.sandbox.network.tlsTerminate).toEqual({});
+    expect(s.sandbox.credentials.envVars).toContainEqual({ name: "NPM_TOKEN", mode: "mask", injectHosts: ["registry.npmjs.org"] });
+    // The literal token in history is never written anywhere.
+    expect(JSON.stringify(s)).not.toContain(FAKE_TOKEN);
+  });
+
   it("refuses a project that is really the home folder", () => {
     const r = sandfit(["--project", home]);
     expect(r.code).toBe(1);

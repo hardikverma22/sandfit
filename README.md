@@ -59,6 +59,35 @@ an unusual folder) so you can keep or drop each one. Enter keeps it.
 
 Then turn the sandbox on in Claude Code with `/sandbox`.
 
+The settings sandfit writes also tell Claude Code to stop with an error if the sandbox can't start
+(`failIfUnavailable`), instead of quietly running commands without it.
+
+Want unlisted websites refused instead of asked about? Write it to your user settings with strict
+mode (Claude Code v2.1.219+; Claude Code ignores this setting in project settings):
+
+```bash
+npx sandfit apply --user --strict-network
+```
+
+### Let commands use your tokens without seeing them
+
+If your agent uses secret environment variables (`curl -H "Authorization: Bearer $OPENAI_API_KEY" …`,
+or `NPM_TOKEN` for npm), sandfit can tell Claude Code to **mask** them: sandboxed commands see a
+placeholder, and Claude Code's sandbox proxy puts the real value back only on requests to the hosts
+your history sent it to. A hijacked command can't read or leak the token, but your requests still work.
+
+```bash
+npx sandfit apply --user --mask-credentials
+```
+
+- sandfit records only variable **names** and where they were sent, never their values.
+- A variable that history only used locally (say `echo "$DB_PASSWORD" > .env.local`) is not masked,
+  because masking would break that.
+- Masking uses Claude Code's experimental TLS termination (`sandbox.network.tlsTerminate`), and
+  Claude Code only accepts it in user settings, hence `--user`. Afterwards run `claude doctor`: a
+  `TLS termination is unavailable` warning means masking can't work on your setup.
+- Run `sandfit explain env` to see which variables would be masked and for which hosts.
+
 ## What the output means
 
 This is real output on the [sample history](demo/sample-history.ts) used in the video
@@ -120,7 +149,7 @@ npx sandfit explain github.com
 
 | Sandbox | Command | What you get |
 |---|---|---|
-| **Claude Code** `/sandbox` | `sandfit apply` | Sandbox rules and secret `deny` rules merged into `.claude/settings.json` (add `--user` for `~/.claude/settings.json`) |
+| **Claude Code** `/sandbox` | `sandfit apply` | Sandbox rules and secret `deny` rules merged into `.claude/settings.json` (add `--user` for `~/.claude/settings.json`, and there `--strict-network` to refuse unlisted hosts and `--mask-credentials` to mask tokens) |
 | **Anthropic sandbox-runtime** (`srt`) | `sandfit apply -t srt` | `~/.srt-settings.json`, then run `srt claude` |
 | **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml` (`--codex-profile` for per-website rules) |
 | **nono** | `sandfit apply -t nono` | `~/.config/nono/profiles/sandfit.json`, then run `nono run --profile sandfit -- claude` |
