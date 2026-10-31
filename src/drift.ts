@@ -36,16 +36,16 @@ function summarize(cs: ConfigChange[]): string {
 }
 
 /** One line for hooks and scripts, or "" when the config is in step with recent history. */
-export function driftLine(d: Drift, days: number | undefined, target: string): string {
+export function driftLine(d: Drift, days: number | undefined, target: string, user = false): string {
   const window = days ? `in the last ${plural(days, "day")}` : "in your history";
-  const t = target === "claude" ? "" : ` -t ${target}`;
+  const t = (target === "claude" ? "" : ` -t ${target}`) + (user ? " --user" : "");
   if (!d.exists) return `sandfit: no sandbox config at ${d.file} yet. Run: npx sandfit apply${t}`;
   if (!d.missing.length) return "";
   return `sandfit: your sandbox config is missing ${summarize(d.missing)} your agent used ${window}, so those commands will be blocked. See: npx sandfit drift${t}`;
 }
 
-export function renderDrift(d: Drift, days: number | undefined, target: string): string {
-  const t = target === "claude" ? "" : ` -t ${target}`;
+export function renderDrift(d: Drift, days: number | undefined, target: string, user = false): string {
+  const t = (target === "claude" ? "" : ` -t ${target}`) + (user ? " --user" : "");
   const window = days ? `the last ${plural(days, "day")}` : "your history";
   const out = ["", `${pc.bold("sandfit drift")} → ${d.file}`];
   if (!d.exists) {

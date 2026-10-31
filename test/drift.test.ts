@@ -44,6 +44,9 @@ describe("drift messages", () => {
       "sandfit: your sandbox config is missing 2 hosts, 3 other rules your agent used in the last 7 days, so those commands will be blocked. See: npx sandfit drift",
     );
     expect(driftLine(d, undefined, "claude")).toContain("used in your history");
+    // The hint must check the same file: user settings need --user.
+    expect(driftLine(d, 7, "claude", true)).toMatch(/See: npx sandfit drift --user$/);
+    expect(plain(renderDrift(d, 7, "claude", true))).toContain("sandfit apply --user");
   });
 
   it("the full report lists missing rules, counts protections, and marks unused ones", () => {

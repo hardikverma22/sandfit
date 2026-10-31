@@ -333,15 +333,15 @@ targetOptions(common(program.command("drift").description("check that your sandb
       const days = o.days > 0 ? o.days : undefined;
       if (o.hook) {
         // A project that never set the sandbox up is not drift: stay quiet there.
-        const line = drift.exists ? driftLine(drift, days, target) : "";
+        const line = drift.exists ? driftLine(drift, days, target, !!o.user) : "";
         if (line) console.log(JSON.stringify({ systemMessage: line }));
         return;
       }
       if (o.json) console.log(JSON.stringify(drift, null, 2));
       else if (o.quiet) {
-        const line = driftLine(drift, days, target);
+        const line = driftLine(drift, days, target, !!o.user);
         if (line) console.log(line);
-      } else console.log(renderDrift(drift, days, target));
+      } else console.log(renderDrift(drift, days, target, !!o.user));
       if (!drift.exists || drift.missing.length) process.exitCode = 1;
     } catch (e) {
       if (o.hook) return;
