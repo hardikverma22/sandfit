@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 (2026-10-31)
 
 ### Changed
 - Releases are published from GitHub Actions with npm provenance, so the npm page links each
