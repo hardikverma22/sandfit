@@ -76,6 +76,9 @@ describe.skipIf(!enabled)("real sandbox: Anthropic sandbox-runtime", () => {
     const policy = buildPolicy(analyze(history.map(ev), { home, readGitRemotes: false }), { home, projects: [project] });
     settingsFile = join(home, "srt-settings.json");
     writeFileSync(settingsFile, JSON.stringify(toSrtSettings(policy), null, 2));
+    // If the sandbox itself cannot start, every "blocked" check would pass for the wrong reason.
+    const probe = srt("true");
+    if (!probe.ok) throw new Error(`sandbox-runtime could not start, so these tests would prove nothing:\n${probe.out}`);
   });
 
   it("allows everything the history needed", () => {

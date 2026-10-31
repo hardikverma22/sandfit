@@ -32,7 +32,7 @@ npm run test:sandbox     # end-to-end against Anthropic's sandbox-runtime (macOS
 npm run dev -- --all     # run the CLI from source
 ```
 
-On Linux, the real-sandbox tests need `bubblewrap` and `socat`.
+On Linux, the real-sandbox tests need `bubblewrap`, `socat` and `ripgrep` (sandbox-runtime's own dependencies).
 
 ## Principles
 

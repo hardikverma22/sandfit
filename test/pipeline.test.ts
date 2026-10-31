@@ -1,4 +1,3 @@
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import fc from "fast-check";
 import { parse as tomlParse } from "smol-toml";
@@ -9,7 +8,7 @@ import { analyze } from "../src/extract/extract.js";
 import { defaultModel, domainAllowed, forecast, modelFromPolicy } from "../src/forecast.js";
 import { ingest } from "../src/ingest/index.js";
 import { buildPolicy, redact } from "../src/policy/build.js";
-import { generalizeHosts, isSecret } from "../src/policy/paths.js";
+import { generalizeHosts, isSecret, tempRoots } from "../src/policy/paths.js";
 import type { AgentEvent } from "../src/types.js";
 
 const HOME = "/home/test";
@@ -123,10 +122,10 @@ describe("emitters", () => {
     expect(claude).toMatchSnapshot("claude");
     expect((claude as any).permissions.allow).toBeUndefined();
     expect((toClaudeSettings(policy, { withPermissions: true }) as any).permissions.allow).toContain("WebFetch(domain:docs.example.com)");
-    // Temp dirs are machine-specific; normalize them so the snapshot is portable.
-    const tmp = tmpdir().replace(/\/+$/, "");
-    const srt = JSON.parse(JSON.stringify(toSrtSettings(policy)).split(tmp.replace(/^\/private/, "")).join("<TMPDIR>"));
-    srt.filesystem.allowWrite = [...new Set(srt.filesystem.allowWrite.map((p: string) => p.replace(/^\/private<TMPDIR>/, "<TMPDIR>")))];
+    // Temp dirs differ by OS (/tmp on Linux, /var/folders/… on macOS); collapse them so the snapshot is portable.
+    const temps = new Set(tempRoots());
+    const srt = toSrtSettings(policy) as any;
+    srt.filesystem.allowWrite = [...new Set(srt.filesystem.allowWrite.map((p: string) => (temps.has(p) ? "<TEMP>" : p)))];
     expect(srt).toMatchSnapshot("srt");
     expect(toNonoProfile(policy)).toMatchSnapshot("nono");
     const codex = toCodexToml(policy);
