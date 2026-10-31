@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `sandfit diff`: what `apply` would change in your sandbox config, entry by entry, without writing
+  anything. Grants are listed in full and protection rules summarized (`--full` lists them). It
+  also flags entries already in your settings that your history never needed. `--json` for scripts.
+- `sandfit apply --review`: keep or drop each grant your history needed only once (or at most N
+  times with `--review-max N`) before anything is written. The forecast is recomputed for what you
+  kept, so you see what dropping a grant would break.
+
+### Changed
+- `apply` shows exactly what it will change before asking, and writes nothing (no new backup)
+  when the config is already up to date.
+
 ## 0.2.0 (2026-10-31)
 
 ### Added

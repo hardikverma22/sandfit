@@ -43,12 +43,19 @@ npx sandfit
 
 That only reads and prints. Nothing is changed, and nothing is sent anywhere.
 
-If you like what you see, write the rules into your project's Claude Code settings
-(sandfit asks first and keeps a backup of the old file):
+If you like what you see, check exactly what would change in your project's Claude Code
+settings, then write it (sandfit shows the changes, asks first and keeps a backup of the old file):
 
 ```bash
-npx sandfit apply
+npx sandfit diff
 ```
+
+```bash
+npx sandfit apply --review
+```
+
+`--review` walks you through anything your history needed only once (one odd `curl`, one copy to
+an unusual folder) so you can keep or drop each one. Enter keeps it.
 
 Then turn the sandbox on in Claude Code with `/sandbox`.
 
@@ -131,9 +138,16 @@ npx sandfit emit -t claude      # or srt, codex, nono, policy
 sandfit                     # summary: what breaks today, what breaks with the rules
 sandfit forecast            # every command that would be blocked, grouped, with the fix
 sandfit explain [text]      # why each rule exists: how often it was needed, one example
+sandfit diff -t <target>    # what apply would change in your config, without writing
 sandfit emit -t <target>    # print the config (claude, srt, codex, nono, policy)
-sandfit apply -t <target>   # write it (asks first, keeps a backup)
+sandfit apply -t <target>   # write it (shows the changes, asks first, keeps a backup)
+sandfit apply --review      # first keep or drop each grant your history needed only once
 ```
+
+`sandfit diff` lists every grant it would add and summarizes the protection rules (secret and
+self-protection denies) as a count; add `--full` to list those too. It also points out entries
+already in your settings that this history never needed: apply keeps them, but you may want to
+remove them by hand.
 
 Options that work everywhere:
 

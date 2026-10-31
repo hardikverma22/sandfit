@@ -8,9 +8,12 @@ import pc from "picocolors";
 import { parse as tomlParse, stringify as tomlStringify } from "smol-toml";
 import { mergeSettings, toClaudeSettings } from "./emit/claude.js";
 import { toCodexToml, toNonoProfile, toPolicyYaml, toSrtSettings } from "./emit/others.js";
-import { renderBlockers, renderExplain, renderSummary } from "./report.js";
+import { diffConfig, unusedEntries } from "./diff.js";
+import { forecast, modelFromPolicy } from "./forecast.js";
+import { plural, renderBlockers, renderChanges, renderDiff, renderExplain, renderSummary } from "./report.js";
+import { parseAnswer, reviewLabel, reviewPolicy } from "./review.js";
 import { run, type RunOptions } from "./run.js";
-import type { Harness } from "./types.js";
+import type { Harness, Policy } from "./types.js";
 import { VERSION } from "./version.js";
 
 const TARGETS = ["claude", "srt", "codex", "nono", "policy"] as const;
@@ -172,69 +175,162 @@ common(program.command("emit").description("print the policy for a sandbox"))
     } else process.stdout.write(text);
   });
 
-common(program.command("apply").description("write the policy into your sandbox's config (keeps a backup)"))
-  .addOption(new Option("-t, --target <target>", "sandbox to configure").choices(["claude", "srt", "codex", "nono"]).default("claude"))
-  .option("--user", "Claude Code: write user settings (~/.claude/settings.json) instead of the project's")
-  .option("--with-permissions", "Claude Code: also add allow rules for WebFetch domains, Edit paths and MCP tools you used")
-  .option("--codex-profile", "Codex: write a permissions profile with per-domain rules")
-  .option("--name <name>", "nono profile name", "sandfit")
+interface Plan {
+  file: string;
+  text: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  generated: Record<string, unknown>;
+  /** The file is replaced, not merged (nono profiles belong to sandfit). */
+  replaces: boolean;
+}
+
+/** Which file a target writes, what it holds now, and what apply would write. */
+function planFor(target: Target, policy: Policy, projects: string[], o: any): Plan {
+  const home = homedir();
+  if (target === "claude") {
+    const file = o.user ? join(process.env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "settings.json") : join(projects[0] ?? process.cwd(), ".claude", "settings.json");
+    const before = readConfig(file, "json");
+    const generated = toClaudeSettings(policy, { withPermissions: !!o.withPermissions });
+    const after = mergeSettings(before, generated);
+    return { file, before, after, generated, text: JSON.stringify(after, null, 2) + "\n", replaces: false };
+  }
+  if (target === "srt") {
+    const file = join(home, ".srt-settings.json");
+    const before = readConfig(file, "json");
+    const generated = toSrtSettings(policy);
+    const after = mergeSettings(before, generated);
+    return { file, before, after, generated, text: JSON.stringify(after, null, 2) + "\n", replaces: false };
+  }
+  if (target === "codex") {
+    const file = join(process.env.CODEX_HOME || join(home, ".codex"), "config.toml");
+    const before = readConfig(file, "toml");
+    const generated = tomlParse(toCodexToml(policy, { profile: !!o.codexProfile })) as Record<string, unknown>;
+    const after = mergeSettings(before, generated);
+    return { file, before, after, generated, text: tomlStringify(after) + "\n", replaces: false };
+  }
+  const file = join(home, ".config", "nono", "profiles", `${o.name ?? "sandfit"}.json`);
+  const before = readConfig(file, "json");
+  const generated = toNonoProfile(policy, o.name ?? "sandfit");
+  return { file, before, after: generated, generated, text: JSON.stringify(generated, null, 2) + "\n", replaces: true };
+}
+
+/** Refuse when there is nothing to build from, or when project settings would be ambiguous. */
+function checkApplicable(target: Target, r: Awaited<ReturnType<typeof run>>, o: any): boolean {
+  if (r.withPolicy.shellCalls === 0) {
+    console.error(pc.yellow(`sandfit: no agent history found for ${r.scopeLabel}; nothing written. Run your agent in this project first, or pass --project.`));
+    process.exitCode = 1;
+    return false;
+  }
+  if (target === "claude" && !o.user && r.projects.length !== 1) {
+    console.error(pc.yellow(`sandfit: this history spans ${r.projects.length} projects. Run it inside one project (or pass --project), or use --user for your user settings.`));
+    process.exitCode = 1;
+    return false;
+  }
+  return true;
+}
+
+/** Reads answers line by line from stdin, whether it is a terminal or a pipe. EOF answers "". */
+function lineReader() {
+  const rl = createInterface({ input: process.stdin, terminal: false });
+  const it = rl[Symbol.asyncIterator]();
+  return {
+    async ask(prompt: string): Promise<string> {
+      process.stdout.write(prompt);
+      const next = await it.next();
+      if (next.done) {
+        process.stdout.write("\n");
+        return "";
+      }
+      if (!process.stdin.isTTY) process.stdout.write(`${next.value}\n`);
+      return next.value;
+    },
+    close: () => rl.close(),
+  };
+}
+
+const targetOptions = (cmd: Command) =>
+  cmd
+    .addOption(new Option("-t, --target <target>", "sandbox to configure").choices(["claude", "srt", "codex", "nono"]).default("claude"))
+    .option("--user", "Claude Code: user settings (~/.claude/settings.json) instead of the project's")
+    .option("--with-permissions", "Claude Code: also add allow rules for WebFetch domains, Edit paths and MCP tools you used")
+    .option("--codex-profile", "Codex: a permissions profile with per-domain rules")
+    .option("--name <name>", "nono profile name", "sandfit");
+
+targetOptions(common(program.command("diff").description("show what apply would change in your sandbox config, without writing anything")))
+  .option("--json", "print machine-readable results")
+  .option("--full", "list every protection rule too, not just a count")
+  .action(async (o) => {
+    const target = o.target as Target;
+    const r = await run(runOpts(o, scopeFor(target)));
+    if (!checkApplicable(target, r, o)) return;
+    const plan = planFor(target, r.policy, r.projects, o);
+    const changes = diffConfig(plan.before, plan.after);
+    const unused = plan.replaces ? [] : unusedEntries(plan.before, plan.generated);
+    if (o.json) {
+      console.log(JSON.stringify({ file: plan.file, exists: existsSync(plan.file), changes, unused }, null, 2));
+      return;
+    }
+    console.log(renderDiff(plan.file, existsSync(plan.file), changes, unused, !!o.full));
+  });
+
+targetOptions(common(program.command("apply").description("write the policy into your sandbox's config (shows the changes, asks first, keeps a backup)")))
+  .option("--review", "go through grants your history needed only rarely, and keep or drop each one")
+  .option("--review-max <n>", "with --review: review grants needed at most N times", intArg(1), 1)
   .option("-y, --yes", "do not ask for confirmation")
   .action(async (o) => {
     const target = o.target as Target;
     const r = await run(runOpts(o, scopeFor(target)));
-    const home = homedir();
-    if (r.withPolicy.shellCalls === 0) {
-      console.error(pc.yellow(`sandfit: no agent history found for ${r.scopeLabel}; nothing written. Run your agent in this project first, or pass --project.`));
-      process.exitCode = 1;
-      return;
-    }
-    if (target === "claude" && !o.user && r.projects.length !== 1) {
-      console.error(pc.yellow(`sandfit: this history spans ${r.projects.length} projects. Run apply inside one project (or pass --project), or use --user for your user settings.`));
-      process.exitCode = 1;
-      return;
-    }
-    let file: string;
-    let text: string;
-    if (target === "claude") {
-      file = o.user ? join(process.env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "settings.json") : join(r.projects[0] ?? process.cwd(), ".claude", "settings.json");
-      const existing = readConfig(file, "json");
-      text = JSON.stringify(mergeSettings(existing, toClaudeSettings(r.policy, { withPermissions: !!o.withPermissions })), null, 2) + "\n";
-    } else if (target === "srt") {
-      file = join(home, ".srt-settings.json");
-      const existing = readConfig(file, "json");
-      text = JSON.stringify(mergeSettings(existing, toSrtSettings(r.policy)), null, 2) + "\n";
-    } else if (target === "codex") {
-      file = join(process.env.CODEX_HOME || join(home, ".codex"), "config.toml");
-      const generated = tomlParse(toCodexToml(r.policy, { profile: !!o.codexProfile })) as Record<string, unknown>;
-      const existing = readConfig(file, "toml");
-      text = tomlStringify(mergeSettings(existing, generated)) + "\n";
-    } else {
-      file = join(home, ".config", "nono", "profiles", `${o.name}.json`);
-      text = JSON.stringify(toNonoProfile(r.policy, o.name), null, 2) + "\n";
-    }
+    if (!checkApplicable(target, r, o)) return;
+    const reader = o.review || (!o.yes && process.stdin.isTTY) ? lineReader() : undefined;
+    try {
+      let policy = r.policy;
+      if (o.review) {
+        const result = await reviewPolicy(
+          policy,
+          async (item, i, total) => {
+            if (i === 0) console.log(`${pc.bold("Review")}  ${plural(total, "grant")} your history needed ${o.reviewMax === 1 ? "only once" : `at most ${o.reviewMax} times`}. Enter keeps it.`);
+            console.log(`  ${pc.dim(`${i + 1}/${total}`)} ${reviewLabel(item.kind)}: ${pc.bold(item.value)}  ${pc.dim(`needed ${plural(item.count, "time")}, e.g. ${item.example.slice(0, 90)}`)}`);
+            return parseAnswer(await reader!.ask(`      ${pc.dim("[k]eep  [d]rop  keep [a]ll  drop all [x]")} `));
+          },
+          o.reviewMax,
+        );
+        policy = result.policy;
+        if (result.reviewed === 0) console.log(pc.dim(`  Nothing to review: every grant was needed more than ${plural(o.reviewMax, "time")}.`));
+        else console.log(`  ${result.dropped.length ? `dropped ${result.dropped.map((d) => d.value).join(", ")}` : "kept everything"}\n`);
+      }
 
-    const broken = r.withPolicy.blockedCalls - r.withPolicy.secretCalls;
-    console.log(`${pc.bold("sandfit apply")} → ${file}`);
-    console.log(`  ${r.policy.network.allowDomains.length} domains, ${r.policy.filesystem.allowWrite.length} extra writable paths, ${r.policy.excludedCommands.length} commands outside the sandbox`);
-    console.log(`  forecast: ${broken} of ${r.withPolicy.shellCalls} past shell commands would still break`);
-    if (!o.yes) {
-      if (!process.stdin.isTTY) {
-        console.error(pc.yellow("  not a terminal: re-run with --yes to write the file"));
-        process.exitCode = 1;
+      const plan = planFor(target, policy, r.projects, o);
+      const changes = diffConfig(plan.before, plan.after);
+      // After a review the policy may have lost grants: forecast the policy that will actually be written.
+      const f = policy === r.policy ? r.withPolicy : forecast(r.analyzed, modelFromPolicy(policy, scopeFor(target) ?? "claude", homedir(), r.projects));
+      const broken = f.blockedCalls - f.secretCalls;
+      console.log(`${pc.bold("sandfit apply")} → ${plan.file}`);
+      console.log(`  forecast: ${broken} of ${f.shellCalls} past shell commands would still break${policy === r.policy || broken === r.withPolicy.blockedCalls - r.withPolicy.secretCalls ? "" : pc.yellow(" (because of what you dropped)")}`);
+      if (changes.length === 0) {
+        console.log(pc.green("  already up to date: nothing to write"));
         return;
       }
-      const rl = createInterface({ input: process.stdin, output: process.stdout });
-      const answer = await rl.question(`  write it${existsSync(file) ? " (a backup of the current file is kept)" : ""}? [y/N] `);
-      rl.close();
-      if (!/^y(es)?$/i.test(answer.trim())) {
-        console.log("  nothing written");
-        return;
+      console.log(renderChanges(changes));
+      if (!o.yes) {
+        if (!reader || !process.stdin.isTTY) {
+          console.error(pc.yellow("  not a terminal: re-run with --yes to write the file"));
+          process.exitCode = 1;
+          return;
+        }
+        const answer = await reader.ask(`  write it${existsSync(plan.file) ? " (a backup of the current file is kept)" : ""}? [y/N] `);
+        if (!/^y(es)?$/i.test(answer.trim())) {
+          console.log("  nothing written");
+          return;
+        }
       }
+      const backup = writeWithBackup(plan.file, plan.text);
+      console.log(pc.green(`  wrote ${plan.file}`) + (backup ? pc.dim(`  (backup: ${backup})`) : ""));
+      if (target === "nono") console.log(pc.dim(`  run your agent with: nono run --profile ${o.name} -- claude`));
+      if (target === "srt") console.log(pc.dim("  run your agent with: srt claude"));
+    } finally {
+      reader?.close();
     }
-    const backup = writeWithBackup(file, text);
-    console.log(pc.green(`  wrote ${file}`) + (backup ? pc.dim(`  (backup: ${backup})`) : ""));
-    if (target === "nono") console.log(pc.dim(`  run your agent with: nono run --profile ${o.name} -- claude`));
-    if (target === "srt") console.log(pc.dim("  run your agent with: srt claude"));
   });
 
 /** Read an existing config file to merge into; refuse (rather than overwrite) one we cannot parse. */

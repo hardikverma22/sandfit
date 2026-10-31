@@ -213,3 +213,53 @@ describe("apply", () => {
     expect(existsSync(join(empty, ".claude"))).toBe(false);
   });
 });
+
+describe("diff and review", () => {
+  const settings = () => join(project, ".claude", "settings.json");
+  const clean = () => rmSync(join(project, ".claude"), { recursive: true, force: true });
+
+  it("diff shows what apply would add, writes nothing, and lists settings history never needed", () => {
+    clean();
+    mkdirSync(join(project, ".claude"), { recursive: true });
+    writeFileSync(settings(), JSON.stringify({ sandbox: { network: { allowedDomains: ["old.example.com"] } } }));
+    const r = sandfit(["diff"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("+ registry.npmjs.org");
+    expect(r.out).toMatch(/permissions\.deny\s+\+\d+ protection rules/);
+    expect(r.out).toContain("· old.example.com");
+    expect(JSON.parse(readFileSync(settings(), "utf8"))).toEqual({ sandbox: { network: { allowedDomains: ["old.example.com"] } } });
+    const j = JSON.parse(sandfit(["diff", "--json"]).out);
+    expect(j.changes).toContainEqual({ path: "sandbox.network.allowedDomains", kind: "add", value: "registry.npmjs.org" });
+    expect(j.unused).toEqual([{ path: "sandbox.network.allowedDomains", kind: "add", value: "old.example.com" }]);
+  });
+
+  it("apply says when there is nothing to change, and does not write a new backup", () => {
+    clean();
+    expect(sandfit(["apply", "-y"]).code).toBe(0);
+    const r = sandfit(["apply", "-y"]);
+    expect(r.out).toContain("already up to date");
+    expect(readdirSync(join(project, ".claude")).filter((f) => f.includes("backup"))).toHaveLength(0);
+    expect(sandfit(["diff"]).out).toContain("already up to date");
+  });
+
+  it("apply --review drops what you say, and re-forecasts what that breaks", () => {
+    clean();
+    // First rare grant: drop it; then drop all the rest.
+    const r = sandfit(["apply", "--review", "-y"], { input: "d\nx\n" });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Review");
+    expect(r.out).toContain("because of what you dropped");
+    const s = JSON.parse(readFileSync(settings(), "utf8"));
+    expect(s.sandbox.network.allowedDomains).toEqual([]);
+    expect(s.permissions.deny).toContain("Read(~/.ssh/**)"); // protections are never reviewed away
+  });
+
+  it("apply --review keeps everything on Enter", () => {
+    clean();
+    const r = sandfit(["apply", "--review", "-y"], { input: "\n\n\n\n\n\n\n\n" });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("kept everything");
+    expect(JSON.parse(readFileSync(settings(), "utf8")).sandbox.network.allowedDomains).toContain("registry.npmjs.org");
+    clean();
+  });
+});

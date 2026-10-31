@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import type { ForecastResult } from "./forecast.js";
+import type { ConfigChange } from "./diff.js";
 import type { Policy } from "./types.js";
 
 export function pct(n: number, d: number): string {
@@ -95,7 +96,8 @@ export function renderSummary(s: SummaryInput): string {
   }
 
   out.push(pc.bold("  Next"));
-  out.push(`  ${pc.green("sandfit apply")}                    write it to .claude/settings.json ${pc.dim("(keeps a backup)")}`);
+  out.push(`  ${pc.green("sandfit diff")}                     what apply would change in .claude/settings.json`);
+  out.push(`  ${pc.green("sandfit apply")}                    write it ${pc.dim("(shows the changes, asks first, keeps a backup)")}`);
   out.push(`  ${pc.green("sandfit explain")}                  why each grant is there, with an example`);
   out.push(`  ${pc.green("sandfit emit --target policy")}     the full policy file to review`);
   out.push(`  ${pc.green("sandfit emit --target srt|codex|nono")}  for other sandboxes`);
@@ -174,5 +176,54 @@ export function renderExplain(policy: Policy, filter?: string): string {
     for (const w of policy.warnings) out.push(`  ${pc.yellow("!")} ${w}`);
     out.push("");
   }
+  return out.join("\n");
+}
+
+/** Changes grouped by key: "+ value" for additions, "- value" for removals, "~ key: a → b" for settings. */
+/**
+ * Keys that hold protections sandfit always adds (secret and self-protection denies). Listing
+ * them in full buries the grants, so they are summarized unless --full is asked for.
+ */
+const PROTECTION_KEYS = /(^|\.)(denyRead|denyWrite|deny)$/;
+
+export function renderChanges(changes: ConfigChange[], opts: { indent?: string; marker?: string; full?: boolean } = {}): string {
+  const indent = opts.indent ?? "  ";
+  const byPath = new Map<string, ConfigChange[]>();
+  for (const c of changes) byPath.set(c.path, [...(byPath.get(c.path) ?? []), c]);
+  const out: string[] = [];
+  for (const [path, cs] of byPath) {
+    const sets = cs.filter((c) => c.kind === "set");
+    for (const c of sets) out.push(`${indent}${pc.yellow("~")} ${path}: ${c.from === "unset" ? "" : `${pc.dim(c.from ?? "")} → `}${c.value}`);
+    const list = cs.filter((c) => c.kind !== "set");
+    if (list.length && !opts.full && !opts.marker && PROTECTION_KEYS.test(path)) {
+      const added = list.filter((c) => c.kind === "add").length;
+      const removed = list.length - added;
+      out.push(`${indent}${pc.cyan(path)}  ${[added ? pc.green(`+${added}`) : "", removed ? pc.red(`-${removed}`) : ""].filter(Boolean).join(" ")} ${pc.dim(`protection ${added + removed === 1 ? "rule" : "rules"} (secrets and the agent's own config; --full lists them)`)}`);
+      continue;
+    }
+    if (list.length) {
+      out.push(`${indent}${pc.cyan(path)}`);
+      for (const c of list) out.push(`${indent}  ${opts.marker ?? (c.kind === "add" ? pc.green("+") : pc.red("-"))} ${c.value}`);
+    }
+  }
+  return out.join("\n");
+}
+
+export function renderDiff(file: string, exists: boolean, changes: ConfigChange[], unused: ConfigChange[], full = false): string {
+  const out: string[] = ["", `${pc.bold("sandfit diff")} → ${file}${exists ? "" : pc.dim("  (does not exist yet: apply would create it)")}`];
+  if (changes.length === 0) out.push(pc.green("  already up to date: apply would change nothing"));
+  else {
+    const added = changes.filter((c) => c.kind === "add").length;
+    const set = changes.filter((c) => c.kind === "set").length;
+    const removed = changes.filter((c) => c.kind === "remove").length;
+    out.push(`  apply would make ${plural(changes.length, "change")} ${pc.dim(`(${added} added, ${set} set${removed ? `, ${removed} removed` : ""})`)}`);
+    out.push(renderChanges(changes, { full }));
+  }
+  if (unused.length) {
+    out.push("");
+    out.push(`  ${pc.dim(`Already in your settings but not needed by this history (apply keeps ${unused.length === 1 ? "it" : "them"}; remove by hand if unwanted):`)}`);
+    out.push(renderChanges(unused, { marker: pc.dim("·") }));
+  }
+  out.push("");
   return out.join("\n");
 }
