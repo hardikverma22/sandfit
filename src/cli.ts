@@ -196,7 +196,7 @@ common(program.command("apply").description("write the policy into your sandbox'
     let file: string;
     let text: string;
     if (target === "claude") {
-      file = o.user ? join(process.env.CLAUDE_CONFIG_DIR ?? join(home, ".claude"), "settings.json") : join(r.projects[0] ?? process.cwd(), ".claude", "settings.json");
+      file = o.user ? join(process.env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "settings.json") : join(r.projects[0] ?? process.cwd(), ".claude", "settings.json");
       const existing = readConfig(file, "json");
       text = JSON.stringify(mergeSettings(existing, toClaudeSettings(r.policy, { withPermissions: !!o.withPermissions })), null, 2) + "\n";
     } else if (target === "srt") {
@@ -204,7 +204,7 @@ common(program.command("apply").description("write the policy into your sandbox'
       const existing = readConfig(file, "json");
       text = JSON.stringify(mergeSettings(existing, toSrtSettings(r.policy)), null, 2) + "\n";
     } else if (target === "codex") {
-      file = join(process.env.CODEX_HOME ?? join(home, ".codex"), "config.toml");
+      file = join(process.env.CODEX_HOME || join(home, ".codex"), "config.toml");
       const generated = tomlParse(toCodexToml(r.policy, { profile: !!o.codexProfile })) as Record<string, unknown>;
       const existing = readConfig(file, "toml");
       text = tomlStringify(mergeSettings(existing, generated)) + "\n";

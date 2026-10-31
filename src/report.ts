@@ -65,9 +65,9 @@ export function renderSummary(s: SummaryInput): string {
   } else {
     out.push(`  ${bar(broken, w.shellCalls)}  ${pc.bold(pc.green(pct(broken, w.shellCalls)))} would break  ${pc.dim(`(${fmt(broken)} of ${fmt(w.shellCalls)})`)}`);
   }
-  if (w.secretCalls > 0) out.push(`  ${pc.yellow(fmt(w.secretCalls))} commands that read secrets are blocked ${pc.dim("on purpose")}`);
+  if (w.secretCalls > 0) out.push(`  ${pc.yellow(plural(w.secretCalls, "command"))} that ${w.secretCalls === 1 ? "reads" : "read"} secrets ${w.secretCalls === 1 ? "is" : "are"} blocked ${pc.dim("on purpose")}`);
   if (w.promptedBefore > 0) out.push(`  Manual approvals you would no longer need: ${pc.bold(fmt(w.promptsAvoided))} of ${fmt(w.promptedBefore)}`);
-  if (w.excludedCalls > 0) out.push(`  ${fmt(w.excludedCalls)} commands run outside the sandbox ${pc.dim("(tools that cannot work inside it)")}`);
+  if (w.excludedCalls > 0) out.push(`  ${plural(w.excludedCalls, "command")} ${w.excludedCalls === 1 ? "runs" : "run"} outside the sandbox ${pc.dim("(tools that cannot work inside it)")}`);
   out.push("");
 
   const p = s.policy;

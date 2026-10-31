@@ -19,8 +19,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      # Unit, CLI, property and accuracy tests, with coverage floors.
+      - run: npm run test:coverage
       - run: npm run build
+      - run: node dist/cli.js --version
+      # Smoke-test performance so a slow regression is noticed.
+      - run: npm run bench:perf -- --sizes 1000,10000
 
   real-sandbox:
     # The forecast is only worth something if it matches a real sandbox.

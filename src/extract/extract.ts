@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AgentEvent, AnalyzedEvent, Need } from "../types.js";
@@ -167,11 +167,13 @@ function shellNeeds(
     case "cp":
     case "ln":
     case "install":
-      if (positional.length >= 2) needs.push({ kind: "write", value: abs(positional[positional.length - 1]!), reason: prog, via: "shell" });
+    case "mv": {
+      const { sources, dest } = copyArgs(args);
+      // mv also removes the sources.
+      if (prog === "mv") for (const p of sources) needs.push({ kind: "write", value: abs(p), reason: "mv", via: "shell" });
+      if (dest && sources.length) for (const t of copyTargets(sources, dest, abs)) needs.push({ kind: "write", value: t, reason: prog, via: "shell" });
       break;
-    case "mv":
-      for (const p of positional) needs.push({ kind: "write", value: abs(p), reason: "mv", via: "shell" });
-      break;
+    }
     case "rm":
     case "rmdir":
     case "mkdir":
@@ -287,6 +289,41 @@ function shellNeeds(
     return;
   }
   if (!KNOWN_LOCAL.has(prog) && !/^[./$~]/.test(prog) && !prog.includes("=") && /^[\w.+-]+$/.test(prog)) unknown.push(prog);
+}
+
+/**
+ * Where cp/mv/ln/install put things: into the destination folder (when it ends with "/",
+ * exists as a folder, or there are several sources), else the destination itself.
+ */
+function copyTargets(sources: string[], raw: string, abs: (p: string) => string): string[] {
+  const dest = abs(raw);
+  let isDir = raw.endsWith("/") || sources.length > 1;
+  if (!isDir) {
+    try {
+      isDir = statSync(dest).isDirectory();
+    } catch {
+      isDir = false;
+    }
+  }
+  if (!isDir) return [dest];
+  return sources.map((s) => `${dest}/${s.replace(/\/+$/, "").split("/").pop()}`);
+}
+
+const COPY_VALUE_FLAGS = new Set(["-m", "--mode", "-o", "--owner", "-g", "--group", "-S", "--suffix"]);
+
+/** Sources and destination of cp/mv/ln/install, honouring -t DIR and flags that take a value. */
+export function copyArgs(args: string[]): { sources: string[]; dest?: string } {
+  const pos: string[] = [];
+  let target: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === "-t" || a === "--target-directory") target = args[++i];
+    else if (a.startsWith("--target-directory=")) target = a.slice(a.indexOf("=") + 1);
+    else if (COPY_VALUE_FLAGS.has(a)) i++;
+    else if (!a.startsWith("-")) pos.push(a);
+  }
+  if (target !== undefined) return { sources: pos, dest: target.endsWith("/") ? target : `${target}/` };
+  return pos.length >= 2 ? { sources: pos.slice(0, -1), dest: pos[pos.length - 1] } : { sources: pos };
 }
 
 /**

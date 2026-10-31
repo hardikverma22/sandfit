@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { expandHome } from "./extract/extract.js";
-import { generalizeWrite, isInside, tempRoots, tildify } from "./policy/paths.js";
+import { generalizeWrite, isInside, tempRoots, tildify, tooBroad } from "./policy/paths.js";
 import { redact } from "./redact.js";
 import type { AnalyzedEvent, Policy } from "./types.js";
 
@@ -11,6 +11,8 @@ import type { AnalyzedEvent, Policy } from "./types.js";
  */
 export interface SandboxModel {
   scope: "claude" | "process";
+  /** Project roots (always writable; used to word fixes). */
+  projects: string[];
   writeRoots: string[];
   denyRead: string[];
   denyWrite: string[];
@@ -46,6 +48,7 @@ export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], ho
   }
   return {
     scope,
+    projects: projs,
     writeRoots,
     denyRead: policy.filesystem.denyRead.filter((p) => !p.includes("*")).flatMap(relToProjects),
     denyWrite: [...policy.filesystem.denyWrite.flatMap(relToProjects), ...runtimeProtected(projs)],
@@ -63,7 +66,7 @@ export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], ho
  * On macOS (Seatbelt) binding needs allowLocalBinding. Verified against sandbox-runtime.
  */
 export function defaultModel(projects: string[], scope: SandboxModel["scope"] = "claude", platform: NodeJS.Platform = process.platform): SandboxModel {
-  return { scope, writeRoots: [...projects, ...tempRoots()], denyRead: [], denyWrite: runtimeProtected(projects), domains: [], localBinding: platform === "linux", sockets: [], excluded: [] };
+  return { scope, projects: [...projects], writeRoots: [...projects, ...tempRoots()], denyRead: [], denyWrite: runtimeProtected(projects), domains: [], localBinding: platform === "linux", sockets: [], excluded: [] };
 }
 
 export function domainAllowed(host: string, patterns: string[]): boolean {
@@ -105,7 +108,7 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
   let bypassed = 0;
   let promptedBefore = 0;
   let promptsAvoided = 0;
-  const projects: string[] = [];
+  const projects = model.projects;
 
   const hit = (key: string, kind: Blocker["kind"], fix: string, example: string) => {
     const b = blockers.get(key) ?? { key, kind, fix, count: 0, examples: [] };
@@ -145,7 +148,9 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
         if (denied || !allowed) {
           blocked = true;
           if (denied) hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (agent config, git hooks/config or shell startup file); run it yourself outside the agent", example);
-          else {
+          else if (tooBroad(n.value, home)) {
+            hit(`write:${tildify(n.value, home)}`, "write", "sandfit never grants this whole folder; have the agent write somewhere narrower", example);
+          } else {
             const g = generalizeWrite(n.value, home, projects) ?? n.value;
             hit(`write:${tildify(g, home)}`, "write", `allowWrite: ${tildify(g, home)}`, example);
           }

@@ -142,7 +142,7 @@ export const CORPUS: Case[] = [
 
   // Writes outside the project
   { cmd: "echo hi > ~/notes.txt", expect: ["write:~/notes.txt"] },
-  { cmd: "mkdir -p ~/.config/myapp && cp config.json ~/.config/myapp/", expect: ["write:~/.config/myapp"] },
+  { cmd: "mkdir -p ~/.config/myapp && cp config.json ~/.config/myapp/", expect: ["write:~/.config/myapp", "write:~/.config/myapp/config.json"] },
   { cmd: "tee -a /var/log/app.log < input.txt", expect: ["write:/var/log/app.log"] },
   { cmd: "touch /tmp/marker", expect: [] },
   { cmd: "rm -rf node_modules dist", expect: [] },
@@ -150,7 +150,7 @@ export const CORPUS: Case[] = [
   { cmd: "sed -i 's/old/new/' ~/.zshrc", expect: ["write:~/.zshrc"] },
   { cmd: 'echo "export PATH=$PATH:~/bin" >> ~/.bashrc', expect: ["write:~/.bashrc"] },
   { cmd: "ln -sf $(pwd)/bin/tool ~/.local/bin/tool", expect: ["write:~/.local/bin/tool"] },
-  { cmd: "mv build.zip ~/Downloads/", expect: ["write:~/Downloads"] },
+  { cmd: "mv build.zip ~/Downloads/", expect: ["write:~/Downloads/build.zip"] },
   { cmd: "tar -xzf archive.tgz -C ~/opt", expect: ["write:~/opt"] },
   { cmd: "unzip -q pkg.zip -d /opt/pkg", expect: ["write:/opt/pkg"] },
   { cmd: "cat > ~/.config/app.toml <<'EOF'\nkey = 1\nEOF", expect: ["write:~/.config/app.toml"] },
