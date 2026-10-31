@@ -151,7 +151,7 @@ npx sandfit explain github.com
 |---|---|---|
 | **Claude Code** `/sandbox` | `sandfit apply` | Sandbox rules and secret `deny` rules merged into `.claude/settings.json` (add `--user` for `~/.claude/settings.json`, and there `--strict-network` to refuse unlisted hosts and `--mask-credentials` to mask tokens) |
 | **Anthropic sandbox-runtime** (`srt`) | `sandfit apply -t srt` | `~/.srt-settings.json`, then run `srt claude` |
-| **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml` (`--codex-profile` for per-website rules) |
+| **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml`. `--codex-profile` writes a per-website permission profile instead (beta in Codex); sandfit won't mix the two styles, since Codex then silently ignores one |
 | **nono** | `sandfit apply -t nono` | `~/.config/nono/profiles/sandfit.json`, then run `nono run --profile sandfit -- claude` |
 | **Anything else** | `sandfit emit -t policy` | The rules as a YAML file, with how often each one was needed and an example |
 
@@ -171,6 +171,8 @@ sandfit diff -t <target>    # what apply would change in your config, without wr
 sandfit emit -t <target>    # print the config (claude, srt, codex, nono, policy)
 sandfit apply -t <target>   # write it (shows the changes, asks first, keeps a backup)
 sandfit apply --review      # first keep or drop each grant your history needed only once
+sandfit learn               # what a sandbox blocked in past sessions, as suggestions
+sandfit apply --learn       # first add the blocked things you recognise (Enter skips)
 ```
 
 `sandfit diff` lists every grant it would add and summarizes the protection rules (secret and
@@ -208,9 +210,34 @@ Every number below comes from code in [`bench/`](bench) and is in [BENCHMARKS.md
 - **Understanding commands.** On 64 hand-labelled commands that sandfit was *not* tuned on, it found what they need with **96% precision and 96% recall**. (On the 143 commands it was tuned on: 100% and 99.5%.) The misses are listed in BENCHMARKS.md.
 - **Speed.** 100,000 tool calls (1.3 GB of transcripts) in about 5 seconds. A heavy month of real use is around 18,000 tool calls: about a second.
 
+## Learn from what the sandbox blocked
+
+History shows commands, not what a script does inside them. Once you have used your agent with the
+sandbox on, the errors in those sessions fill that gap: a Python script that was refused
+`api.acme.dev`, a build tool that couldn't write its cache.
+
+```bash
+npx sandfit learn
+```
+
+```text
+  ? write    ~/.cache/mytool  blocked 1 time
+      e.g. node build.mjs
+  ? network  api.acme.dev  blocked 1 time
+      e.g. python scripts/sync.py
+  ? network  exfil.evil.example  blocked 1 time
+      e.g. ./deploy.sh
+```
+
+None of these is added for you: a blocked attempt can also be an attack (look at that last one).
+`sandfit apply --learn` asks about each, and Enter skips. sandfit never suggests secrets, shell
+startup files, the agent's own config or broad folders. It only uses errors that name the host or
+path (for example `Read-only file system` on Linux, `Operation not permitted` on macOS, or a failed
+lookup that names the host), so a blocked `curl` that only says `CONNECT tunnel failed` teaches it nothing.
+
 ## Known limits
 
-- sandfit sees **commands**, not everything a command does inside. If a script calls an API sandfit has never heard of, that website is not in the rules until you run it once with the sandbox on. sandfit lists such tools under "Tools sandfit has no knowledge of".
+- sandfit sees **commands**, not everything a command does inside. If a script calls an API sandfit has never heard of, that website is not in the rules until you run it once with the sandbox on; then `sandfit learn` picks it up from the error. sandfit lists such tools under "Tools sandfit has no knowledge of".
 - On **Linux**, every sandboxed command gets its own network, so a dev server started by one command cannot be reached by the next. That is how the sandbox works there, not something sandfit can change.
 - The Codex and nono configs are checked against those tools' published schemas, but only sandbox-runtime (which Claude Code's sandbox is built on) is tested by actually running commands.
 

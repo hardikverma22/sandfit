@@ -283,3 +283,64 @@ describe("diff and review", () => {
     clean();
   });
 });
+
+describe("learn", () => {
+  let learnProject: string;
+  beforeAll(() => {
+    learnProject = join(home, "learnapp");
+    mkdirSync(join(learnProject, ".git"), { recursive: true });
+    writeClaudeTranscript(
+      join(home, ".claude", "projects", "-learnapp", "l.jsonl"),
+      learnProject,
+      [
+        { command: "npm install" },
+        { command: "python scripts/sync.py", output: "HTTPSConnectionPool(host='api.acme.dev', port=443): Max retries exceeded (Caused by ProxyError('x', OSError('Tunnel connection failed: 403 Forbidden')))" },
+        { command: "./deploy.sh", output: `touch: cannot touch '${home}/.zshrc': Read-only file system\nError: getaddrinfo EAI_AGAIN exfil.evil.example` },
+      ],
+      "learn",
+    );
+  });
+
+  it("lists what was blocked, but never protected files", () => {
+    const r = sandfit(["learn"], { cwd: learnProject });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("api.acme.dev");
+    expect(r.out).toContain("exfil.evil.example");
+    expect(r.out).not.toContain(".zshrc");
+    expect(JSON.parse(sandfit(["learn", "--json"], { cwd: learnProject }).out).suggestions).toHaveLength(2);
+  });
+
+  it("apply --learn adds only what you accept; Enter skips", () => {
+    const r = sandfit(["apply", "--learn", "-y"], { cwd: learnProject, input: "a\n\n" });
+    expect(r.code).toBe(0);
+    const s = JSON.parse(readFileSync(join(learnProject, ".claude", "settings.json"), "utf8"));
+    expect(s.sandbox.network.allowedDomains).toContain("api.acme.dev");
+    expect(s.sandbox.network.allowedDomains).not.toContain("exfil.evil.example");
+  });
+
+  it("says when there is nothing to learn", () => {
+    expect(sandfit(["learn"]).out).toContain("No sandbox blocks found");
+  });
+});
+
+describe("codex: the two config styles never mix", () => {
+  const cfg = () => join(home, ".codex", "config.toml");
+
+  it("refuses a permission profile on top of sandbox_mode, and the reverse", () => {
+    mkdirSync(join(home, ".codex"), { recursive: true });
+    writeFileSync(cfg(), 'sandbox_mode = "workspace-write"\n');
+    const r = sandfit(["apply", "-t", "codex", "--codex-profile", "-y"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("ignores permission profiles while sandbox_mode is set");
+    expect(readFileSync(cfg(), "utf8")).toBe('sandbox_mode = "workspace-write"\n');
+
+    writeFileSync(cfg(), 'default_permissions = "mine"\n');
+    expect(sandfit(["apply", "-t", "codex", "-y"]).err).toContain("Use --codex-profile");
+
+    writeFileSync(cfg(), 'model = "o3"\n');
+    expect(sandfit(["apply", "-t", "codex", "--codex-profile", "-y"]).code).toBe(0);
+    const written = tomlParse(readFileSync(cfg(), "utf8")) as any;
+    expect(written).toMatchObject({ model: "o3", default_permissions: "sandfit", features: { network_proxy: true }, permissions: { sandfit: { extends: ":workspace" } } });
+    expect(written.sandbox_mode).toBeUndefined();
+  });
+});

@@ -10,7 +10,8 @@ import { mergeSettings, toClaudeSettings } from "./emit/claude.js";
 import { toCodexToml, toNonoProfile, toPolicyYaml, toSrtSettings } from "./emit/others.js";
 import { diffConfig, unusedEntries } from "./diff.js";
 import { forecast, modelFromPolicy } from "./forecast.js";
-import { plural, renderBlockers, renderChanges, renderDiff, renderExplain, renderSummary } from "./report.js";
+import { plural, renderBlockers, renderChanges, renderDiff, renderExplain, renderLearn, renderSummary } from "./report.js";
+import { addToPolicy, learnSuggestions } from "./learn.js";
 import { parseAnswer, reviewLabel, reviewPolicy } from "./review.js";
 import { run, type RunOptions } from "./run.js";
 import type { Harness, Policy } from "./types.js";
@@ -159,6 +160,19 @@ common(program.command("explain").description("show why each grant is in the pol
     if (filter && text.includes("No grant matches")) process.exitCode = 1;
   });
 
+common(program.command("learn").description("list what a sandbox actually blocked in your past sessions, as suggestions to add"))
+  .addOption(new Option("--scope <scope>", "claude: Claude Code's Bash sandbox; process: a sandbox around the whole agent").choices(["claude", "process"]).default("claude"))
+  .option("--json", "print machine-readable results")
+  .action(async (o) => {
+    const r = await run(runOpts(o, o.scope));
+    const suggestions = learnSuggestions(r.analyzed, r.policy, homedir(), r.projects);
+    if (o.json) {
+      console.log(JSON.stringify({ suggestions }, null, 2));
+      return;
+    }
+    console.log(renderLearn(suggestions));
+  });
+
 common(program.command("emit").description("print the policy for a sandbox"))
   .addOption(new Option("-t, --target <target>", "output format").choices([...TARGETS]).default("claude"))
   .option("--codex-profile", "emit a Codex permissions profile with per-domain rules")
@@ -210,6 +224,13 @@ function planFor(target: Target, policy: Policy, projects: string[], o: any): Pl
   if (target === "codex") {
     const file = join(process.env.CODEX_HOME || join(home, ".codex"), "config.toml");
     const before = readConfig(file, "toml");
+    // Codex treats the two styles as mutually exclusive; mixing them makes one silently win.
+    if (o.codexProfile && ("sandbox_mode" in before || "sandbox_workspace_write" in before)) {
+      throw new Error(`${file} uses sandbox_mode, and Codex ignores permission profiles while sandbox_mode is set. Remove sandbox_mode and [sandbox_workspace_write] from it first, or drop --codex-profile.`);
+    }
+    if (!o.codexProfile && "default_permissions" in before) {
+      throw new Error(`${file} uses permission profiles (default_permissions). Writing sandbox_mode would make Codex ignore them. Use --codex-profile, or remove default_permissions first.`);
+    }
     const generated = tomlParse(toCodexToml(policy, { profile: !!o.codexProfile })) as Record<string, unknown>;
     const after = mergeSettings(before, generated);
     return { file, before, after, generated, text: tomlStringify(after) + "\n", replaces: false };
@@ -293,15 +314,38 @@ targetOptions(common(program.command("diff").description("show what apply would 
 
 targetOptions(common(program.command("apply").description("write the policy into your sandbox's config (shows the changes, asks first, keeps a backup)")))
   .option("--review", "go through grants your history needed only rarely, and keep or drop each one")
+  .option("--learn", "go through what a sandbox blocked in past sessions, and add the ones you trust (nothing is added unless you say so)")
   .option("--review-max <n>", "with --review: review grants needed at most N times", intArg(1), 1)
   .option("-y, --yes", "do not ask for confirmation")
   .action(async (o) => {
     const target = o.target as Target;
     const r = await run(runOpts(o, scopeFor(target)));
     if (!checkApplicable(target, r, o)) return;
-    const reader = o.review || (!o.yes && process.stdin.isTTY) ? lineReader() : undefined;
+    const reader = o.review || o.learn || (!o.yes && process.stdin.isTTY) ? lineReader() : undefined;
     try {
       let policy = r.policy;
+      if (o.learn) {
+        const suggestions = learnSuggestions(r.analyzed, policy, homedir(), r.projects);
+        if (suggestions.length === 0) console.log(pc.dim("  Nothing to learn: no sandbox blocks found in this history that the policy does not already allow."));
+        else {
+          console.log(`${pc.bold("Learn")}  ${plural(suggestions.length, "thing")} a sandbox blocked in past sessions. ${pc.yellow("Enter skips it")}: add only what you recognise.`);
+          const accepted: typeof suggestions = [];
+          let rest: "add" | "skip" | undefined;
+          for (const [i, sug] of suggestions.entries()) {
+            let answer = rest;
+            if (!answer) {
+              console.log(`  ${pc.dim(`${i + 1}/${suggestions.length}`)} ${sug.kind === "domain" ? "network" : "write"}: ${pc.bold(sug.value)}  ${pc.dim(`blocked ${plural(sug.count, "time")}, e.g. ${sug.examples[0]?.slice(0, 90) ?? ""}`)}`);
+              const line = (await reader!.ask(`      ${pc.dim("[a]dd  [s]kip  add all [A]  skip all [S]")} `)).trim();
+              if (line === "A") rest = "add";
+              if (line === "S") rest = "skip";
+              answer = rest ?? (/^(a|add|y|yes)$/i.test(line) ? "add" : "skip");
+            }
+            if (answer === "add") accepted.push(sug);
+          }
+          policy = addToPolicy(policy, accepted);
+          console.log(`  ${accepted.length ? `added ${accepted.map((a) => a.value).join(", ")}` : "added nothing"}\n`);
+        }
+      }
       if (o.review) {
         const result = await reviewPolicy(
           policy,

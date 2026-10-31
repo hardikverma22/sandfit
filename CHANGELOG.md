@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- `sandfit learn`: lists what a sandbox actually blocked in past sessions (hosts and paths named
+  in the errors of sandboxed commands: a script refused an API, a tool that couldn't write its
+  cache). These are the needs a command's text doesn't show.
+- `sandfit apply --learn`: asks about each blocked host or path, and adds only what you accept.
+  Enter skips, because a blocked attempt can be an attack. Secrets, shell startup files, the agent's
+  own config and broad folders are never suggested.
 - `--strict-network` (Claude Code, with `--user`): writes `sandbox.network.strictAllowlist`, so hosts
   outside the allowlist are refused instead of prompting. Needs Claude Code v2.1.219 or later. Claude
   Code only honours it in user or managed settings, so sandfit refuses it for project settings
@@ -24,6 +30,12 @@
 
 ### Fixed
 - Re-applying no longer duplicates list entries that are objects (such as credential entries).
+- `--codex-profile` now writes what Codex's permission profiles need: `extends = ":workspace"` (so
+  the project is writable and `.git/`, `.codex/` stay read-only) and `features.network_proxy = true`
+  (without it Codex does not enforce the per-domain rules).
+- `apply -t codex` refuses to mix the two Codex config styles: a profile on top of `sandbox_mode`
+  (Codex would ignore the profile) or `sandbox_mode` on top of a profile (Codex would ignore the
+  profile you had). Nothing is written in either case.
 
 ## 0.3.1 (2026-10-31)
 

@@ -27,6 +27,8 @@ export interface AgentEvent {
   sandboxBypass?: boolean;
   /** The tool result was an error. */
   failed?: boolean;
+  /** What the command's output says a sandbox blocked (paths, hosts). Only these, never the output. */
+  blocked?: { kind: "net" | "write"; value: string }[];
 }
 
 export type NeedKind = "read" | "write" | "net" | "bind" | "socket" | "mcp" | "exec" | "env";

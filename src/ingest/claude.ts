@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { findBlocks } from "./blocks.js";
 import { readLines } from "./lines.js";
 import type { AgentEvent, Decision, ToolKind } from "../types.js";
 
@@ -100,9 +101,20 @@ export async function parseClaudeTranscript(file: string): Promise<AgentEvent[]>
         if (!p) continue;
         p.event.decision = toDecision(entry.permissionDecision);
         if (block.is_error === true) p.event.failed = true;
+        if (p.event.tool === "bash") {
+          const blocked = findBlocks(resultText(block.content), p.event.cwd || "/");
+          if (blocked.length) p.event.blocked = blocked;
+        }
         pending.delete(String(block.tool_use_id));
       }
     }
   }
   return events;
+}
+
+/** The text of a tool_result: a string, or a list of {type: "text", text} parts. */
+function resultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.map((c) => (typeof c?.text === "string" ? c.text : "")).join("\n");
+  return "";
 }
