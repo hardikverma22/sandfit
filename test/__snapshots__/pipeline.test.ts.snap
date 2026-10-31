@@ -41,6 +41,7 @@ exports[`emitters > produce valid configs for every target > claude 1`] = `
       "docker *",
       "git push *",
     ],
+    "failIfUnavailable": true,
     "filesystem": {
       "allowWrite": [
         "~/shared/notes",

@@ -31,7 +31,7 @@ describe("emitted configs match the tools' published schemas", () => {
   it("Claude Code settings", async () => {
     const validate = validator(schema("claude-code-settings.json"));
     const p = await policy();
-    for (const settings of [toClaudeSettings(p), toClaudeSettings(p, { withPermissions: true })]) {
+    for (const settings of [toClaudeSettings(p), toClaudeSettings(p, { withPermissions: true }), toClaudeSettings(p, { user: true, strictNetwork: true })]) {
       const ok = validate(settings);
       expect(validate.errors ?? []).toEqual([]);
       expect(ok).toBe(true);

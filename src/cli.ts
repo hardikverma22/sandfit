@@ -73,7 +73,7 @@ function scopeFor(target: Target): RunOptions["scope"] {
 function render(target: Target, policy: Awaited<ReturnType<typeof run>>["policy"], o: any): string {
   switch (target) {
     case "claude":
-      return JSON.stringify(toClaudeSettings(policy, { withPermissions: !!o.withPermissions }), null, 2) + "\n";
+      return JSON.stringify(toClaudeSettings(policy, { withPermissions: !!o.withPermissions, strictNetwork: !!o.strictNetwork, user: !!o.user }), null, 2) + "\n";
     case "srt":
       return JSON.stringify(toSrtSettings(policy), null, 2) + "\n";
     case "codex":
@@ -163,10 +163,13 @@ common(program.command("emit").description("print the policy for a sandbox"))
   .addOption(new Option("-t, --target <target>", "output format").choices([...TARGETS]).default("claude"))
   .option("--codex-profile", "emit a Codex permissions profile with per-domain rules")
   .option("--with-permissions", "Claude Code: also add allow rules for WebFetch domains, Edit paths and MCP tools you used")
+  .option("--user", "Claude Code: settings meant for ~/.claude/settings.json (needed for --strict-network)")
+  .option("--strict-network", "Claude Code: refuse hosts outside the allowlist instead of prompting (user settings only, Claude Code v2.1.219+)")
   .option("--name <name>", "profile name (nono)")
   .option("-o, --out <file>", "write to a file instead of stdout")
   .action(async (o) => {
     const target = o.target as Target;
+    if (o.strictNetwork && target !== "claude") throw new Error("--strict-network is a Claude Code setting; it does not apply to this target.");
     const r = await run(runOpts(o, scopeFor(target)));
     const text = render(target, r.policy, o);
     if (o.out) {
@@ -191,7 +194,7 @@ function planFor(target: Target, policy: Policy, projects: string[], o: any): Pl
   if (target === "claude") {
     const file = o.user ? join(process.env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "settings.json") : join(projects[0] ?? process.cwd(), ".claude", "settings.json");
     const before = readConfig(file, "json");
-    const generated = toClaudeSettings(policy, { withPermissions: !!o.withPermissions });
+    const generated = toClaudeSettings(policy, { withPermissions: !!o.withPermissions, strictNetwork: !!o.strictNetwork, user: !!o.user });
     const after = mergeSettings(before, generated);
     return { file, before, after, generated, text: JSON.stringify(after, null, 2) + "\n", replaces: false };
   }
@@ -217,6 +220,11 @@ function planFor(target: Target, policy: Policy, projects: string[], o: any): Pl
 
 /** Refuse when there is nothing to build from, or when project settings would be ambiguous. */
 function checkApplicable(target: Target, r: Awaited<ReturnType<typeof run>>, o: any): boolean {
+  if (o.strictNetwork && target !== "claude") {
+    console.error(pc.yellow("sandfit: --strict-network is a Claude Code setting; it does not apply to this target."));
+    process.exitCode = 1;
+    return false;
+  }
   if (r.withPolicy.shellCalls === 0) {
     console.error(pc.yellow(`sandfit: no agent history found for ${r.scopeLabel}; nothing written. Run your agent in this project first, or pass --project.`));
     process.exitCode = 1;
@@ -255,6 +263,7 @@ const targetOptions = (cmd: Command) =>
     .option("--user", "Claude Code: user settings (~/.claude/settings.json) instead of the project's")
     .option("--with-permissions", "Claude Code: also add allow rules for WebFetch domains, Edit paths and MCP tools you used")
     .option("--codex-profile", "Codex: a permissions profile with per-domain rules")
+    .option("--strict-network", "Claude Code: refuse hosts outside the allowlist instead of prompting (user settings only, Claude Code v2.1.219+)")
     .option("--name <name>", "nono profile name", "sandfit");
 
 targetOptions(common(program.command("diff").description("show what apply would change in your sandbox config, without writing anything")))

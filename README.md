@@ -59,6 +59,16 @@ an unusual folder) so you can keep or drop each one. Enter keeps it.
 
 Then turn the sandbox on in Claude Code with `/sandbox`.
 
+The settings sandfit writes also tell Claude Code to stop with an error if the sandbox can't start
+(`failIfUnavailable`), instead of quietly running commands without it.
+
+Want unlisted websites refused instead of asked about? Write it to your user settings with strict
+mode (Claude Code v2.1.219+; Claude Code ignores this setting in project settings):
+
+```bash
+npx sandfit apply --user --strict-network
+```
+
 ## What the output means
 
 This is real output on the [sample history](demo/sample-history.ts) used in the video
@@ -120,7 +130,7 @@ npx sandfit explain github.com
 
 | Sandbox | Command | What you get |
 |---|---|---|
-| **Claude Code** `/sandbox` | `sandfit apply` | Sandbox rules and secret `deny` rules merged into `.claude/settings.json` (add `--user` for `~/.claude/settings.json`) |
+| **Claude Code** `/sandbox` | `sandfit apply` | Sandbox rules and secret `deny` rules merged into `.claude/settings.json` (add `--user` for `~/.claude/settings.json`, and `--strict-network` there to refuse unlisted hosts) |
 | **Anthropic sandbox-runtime** (`srt`) | `sandfit apply -t srt` | `~/.srt-settings.json`, then run `srt claude` |
 | **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml` (`--codex-profile` for per-website rules) |
 | **nono** | `sandfit apply -t nono` | `~/.config/nono/profiles/sandfit.json`, then run `nono run --profile sandfit -- claude` |

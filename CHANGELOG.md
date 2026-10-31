@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `--strict-network` (Claude Code, with `--user`): writes `sandbox.network.strictAllowlist`, so hosts
+  outside the allowlist are refused instead of prompting. Needs Claude Code v2.1.219 or later. Claude
+  Code only honours it in user or managed settings, so sandfit refuses it for project settings
+  rather than writing a setting that would do nothing.
+
+### Changed
+- Claude Code settings now include `sandbox.failIfUnavailable: true`. Without it, Claude Code runs
+  commands unsandboxed when the sandbox cannot start, so a broken setup silently means no sandbox.
+  Your own value is kept if you already set one.
+
 ## 0.3.1 (2026-10-31)
 
 ### Changed

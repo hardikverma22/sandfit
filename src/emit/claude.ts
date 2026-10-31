@@ -14,6 +14,14 @@ export interface ClaudeEmitOptions {
    * loosens them unless asked.
    */
   withPermissions?: boolean;
+  /**
+   * Refuse hosts outside the allowlist instead of prompting (sandbox.network.strictAllowlist,
+   * Claude Code v2.1.219+). Claude Code only honours it in user or managed settings, so it is
+   * only valid together with `user`.
+   */
+  strictNetwork?: boolean;
+  /** The settings are for ~/.claude/settings.json rather than a project's .claude/settings.json. */
+  user?: boolean;
 }
 
 export function toClaudeSettings(policy: Policy, opts: ClaudeEmitOptions = {}): Record<string, unknown> {
@@ -21,8 +29,13 @@ export function toClaudeSettings(policy: Policy, opts: ClaudeEmitOptions = {}): 
   const secretsAbs = policy.filesystem.denyRead.filter((p) => !p.startsWith("./"));
   const globs = policy.filesystem.denyRead.filter((p) => p.startsWith("./") && p.includes("*"));
 
+  if (opts.strictNetwork && !opts.user) {
+    throw new Error("strict network mode only works in user settings: Claude Code ignores sandbox.network.strictAllowlist in a project's .claude/settings.json. Add --user.");
+  }
   const sandbox: Record<string, unknown> = {
     enabled: true,
+    // Without this, Claude Code silently runs commands unsandboxed when the sandbox cannot start.
+    failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
   };
@@ -30,6 +43,7 @@ export function toClaudeSettings(policy: Policy, opts: ClaudeEmitOptions = {}): 
   const network: Record<string, unknown> = { allowedDomains: policy.network.allowDomains };
   if (policy.network.allowLocalBinding) network.allowLocalBinding = true;
   if (policy.network.allowUnixSockets.length) network.allowUnixSockets = policy.network.allowUnixSockets;
+  if (opts.strictNetwork) network.strictAllowlist = true;
   sandbox.network = network;
   sandbox.filesystem = {
     allowWrite: policy.filesystem.allowWrite,

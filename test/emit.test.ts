@@ -30,8 +30,8 @@ function policy(over: Partial<Policy> = {}): Policy {
 describe("Claude Code settings", () => {
   const s = toClaudeSettings(policy()) as any;
 
-  it("turns the sandbox on without allowing an escape hatch", () => {
-    expect(s.sandbox).toMatchObject({ enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false, excludedCommands: ["docker *"] });
+  it("turns the sandbox on without allowing an escape hatch, and refuses to run unsandboxed", () => {
+    expect(s.sandbox).toMatchObject({ enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false, excludedCommands: ["docker *"] });
     expect(s.sandbox.network).toEqual({ allowedDomains: ["registry.npmjs.org"], allowLocalBinding: true, allowUnixSockets: ["/tmp/x.sock"] });
   });
 
@@ -41,6 +41,12 @@ describe("Claude Code settings", () => {
     );
     const withPerms = toClaudeSettings(policy({ harnessTools: { allowWrite: ["/abs/dir"], allowFetch: [] } }), { withPermissions: true }) as any;
     expect(withPerms.permissions.allow).toEqual(["Edit(//abs/dir/**)", "mcp__github__create_issue"]);
+  });
+
+  it("strict network mode is only written to user settings, where Claude Code honours it", () => {
+    expect(s.sandbox.network.strictAllowlist).toBeUndefined();
+    expect((toClaudeSettings(policy(), { user: true, strictNetwork: true }) as any).sandbox.network.strictAllowlist).toBe(true);
+    expect(() => toClaudeSettings(policy(), { strictNetwork: true })).toThrow("user settings");
   });
 
   it("only adds harness-tool grants to the OS sandbox config when asked", () => {
