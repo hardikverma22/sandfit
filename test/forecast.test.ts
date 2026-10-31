@@ -122,8 +122,10 @@ describe("current Claude Code settings", () => {
 describe("report", () => {
   const events = run([bash("npm install"), bash("echo x >> ~/shared/log"), bash("cat ~/.ssh/id_rsa")]);
   const policy = buildPolicy(events, { home, projects: [project] });
+  // Colors are on in some CI terminals; compare plain text.
+  const plain = (t: string) => t.replace(/\x1b\[[0-9;]*m/g, "");
   const summary = (evs = events) =>
-    renderSummary({
+    plain(renderSummary({
       version: "0.0.0",
       scopeLabel: "project ~/app",
       harnessLabel: "Claude Code",
@@ -133,7 +135,7 @@ describe("report", () => {
       baselineConfigured: false,
       withPolicy: forecast(evs, modelFromPolicy(policy, "claude", home, [project]), home),
       policy,
-    });
+    }));
 
   it("summarizes before and after in plain words", () => {
     const s = summary();
@@ -147,9 +149,9 @@ describe("report", () => {
   });
 
   it("explains grants and filters them", () => {
-    expect(renderExplain(policy)).toContain("Always denied");
-    expect(renderExplain(policy, "npm")).toContain("registry.npmjs.org");
-    expect(renderExplain(policy, "npm")).not.toContain("~/shared");
-    expect(renderExplain(policy, "zzz")).toContain('No grant matches "zzz"');
+    expect(plain(renderExplain(policy))).toContain("Always denied");
+    expect(plain(renderExplain(policy, "npm"))).toContain("registry.npmjs.org");
+    expect(plain(renderExplain(policy, "npm"))).not.toContain("~/shared");
+    expect(plain(renderExplain(policy, "zzz"))).toContain('No grant matches "zzz"');
   });
 });
