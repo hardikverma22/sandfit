@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `sandfit drift`: checks that your sandbox config still covers what your agent did recently
+  (default: the last 30 days). It lists the rules your config is missing, which means those
+  commands will be blocked, and the rules nothing used, which it only reports. It exits 1 when
+  something is missing, for CI and scripts. `--quiet` prints one line, `--json` the full result.
+- `sandfit drift --hook`: the same check as a Claude Code SessionStart hook. When the config is
+  missing something, the session opens with a one-line warning. It always exits 0, and stays
+  quiet in projects that never set the sandbox up.
+
 ## 0.4.0 (2026-10-31)
 
 ### Added
