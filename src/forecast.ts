@@ -20,6 +20,20 @@ export interface SandboxModel {
   excluded: string[];
 }
 
+/**
+ * Paths inside the working folder that sandbox-runtime (and so Claude Code's sandbox) never
+ * lets a sandboxed command write, whatever the configuration says. From sandbox-runtime's
+ * DANGEROUS_FILES / getDangerousDirectories / linuxGetCwdMandatoryDenyPaths.
+ */
+export const RUNTIME_PROTECTED = [
+  ".gitconfig", ".gitmodules", ".bashrc", ".bash_profile", ".zshrc", ".zprofile", ".profile", ".ripgreprc", ".mcp.json",
+  ".vscode", ".idea", ".claude/commands", ".claude/agents", ".git/hooks", ".git/config",
+];
+
+export function runtimeProtected(projects: string[]): string[] {
+  return projects.flatMap((p) => RUNTIME_PROTECTED.map((r) => `${p}/${r}`));
+}
+
 export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], home = homedir(), projects?: string[]): SandboxModel {
   const abs = (p: string) => expandHome(p, home);
   const projs = (projects ?? policy.projects.map(abs));
@@ -34,7 +48,7 @@ export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], ho
     scope,
     writeRoots,
     denyRead: policy.filesystem.denyRead.filter((p) => !p.includes("*")).flatMap(relToProjects),
-    denyWrite: policy.filesystem.denyWrite.flatMap(relToProjects),
+    denyWrite: [...policy.filesystem.denyWrite.flatMap(relToProjects), ...runtimeProtected(projs)],
     domains,
     localBinding: policy.network.allowLocalBinding,
     sockets: policy.network.allowUnixSockets,
@@ -42,9 +56,14 @@ export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], ho
   };
 }
 
-/** The sandbox you get by switching it on with no extra configuration. */
-export function defaultModel(projects: string[], scope: SandboxModel["scope"] = "claude"): SandboxModel {
-  return { scope, writeRoots: [...projects, ...tempRoots()], denyRead: [], denyWrite: [], domains: [], localBinding: false, sockets: [], excluded: [] };
+/**
+ * The sandbox you get by switching it on with no extra configuration.
+ * On Linux (bubblewrap) every sandboxed command gets its own network namespace, so binding
+ * a local port always succeeds there (though nothing outside that command can reach it).
+ * On macOS (Seatbelt) binding needs allowLocalBinding. Verified against sandbox-runtime.
+ */
+export function defaultModel(projects: string[], scope: SandboxModel["scope"] = "claude", platform: NodeJS.Platform = process.platform): SandboxModel {
+  return { scope, writeRoots: [...projects, ...tempRoots()], denyRead: [], denyWrite: runtimeProtected(projects), domains: [], localBinding: platform === "linux", sockets: [], excluded: [] };
 }
 
 export function domainAllowed(host: string, patterns: string[]): boolean {
@@ -125,7 +144,7 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
         // the sandbox protects secrets from being read, not from being created.
         if (denied || !allowed) {
           blocked = true;
-          if (denied) hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (agent config or shell startup file)", example);
+          if (denied) hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (agent config, git hooks/config or shell startup file); run it yourself outside the agent", example);
           else {
             const g = generalizeWrite(n.value, home, projects) ?? n.value;
             hit(`write:${tildify(g, home)}`, "write", `allowWrite: ${tildify(g, home)}`, example);

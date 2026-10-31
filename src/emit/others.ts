@@ -16,6 +16,8 @@ export function toSrtSettings(policy: Policy): Record<string, unknown> {
     network: {
       allowedDomains: uniq([...policy.network.allowDomains, ...policy.harnessTools.allowFetch]),
       deniedDomains: policy.network.denyDomains,
+      ...(policy.network.allowLocalBinding ? { allowLocalBinding: true } : {}),
+      ...(policy.network.allowUnixSockets.length ? { allowUnixSockets: policy.network.allowUnixSockets } : {}),
     },
     filesystem: {
       denyRead: [...policy.filesystem.denyRead.filter((p) => !p.startsWith("./")), ...projectSecrets.map((p) => p.slice(2))],

@@ -206,6 +206,12 @@ function shellNeeds(
   if (prog === "git") {
     const positional = cleanPositional(args);
     const sub = positional[0] ?? "";
+    // git config / git remote add|set-url|remove write .git/config (or ~/.gitconfig with --global).
+    const readOnlyConfig = args.some((a) => /^--(get|get-all|get-regexp|list|show-origin)$/.test(a) || a === "-l") || (sub === "config" && cleanPositional(args.filter((a) => a !== "config")).length < 2);
+    if ((sub === "config" && !readOnlyConfig) || (sub === "remote" && ["add", "set-url", "remove", "rm", "rename"].includes(positional[1] ?? ""))) {
+      const target = args.includes("--global") ? join(home, ".gitconfig") : args.includes("--system") ? "/etc/gitconfig" : join(gitRootOf(cmd.cwd) ?? cmd.cwd, ".git", "config");
+      needs.push({ kind: "write", value: target, reason: `git ${sub}`, via: "shell" });
+    }
     const netSubs = new Set(["clone", "fetch", "pull", "push", "ls-remote", "submodule", "remote"]);
     if (netSubs.has(sub) && !(sub === "remote" && !args.includes("update")) && !(sub === "submodule" && !args.includes("update"))) {
       const urlArgs = positional.filter((a) => gitUrlHost(a));
@@ -314,6 +320,18 @@ export function sedInPlaceFiles(args: string[], prog = "sed"): string[] {
   }
   if (!inPlace) return [];
   return (explicitScript ? positional : positional.slice(1)).filter((p) => p !== "");
+}
+
+/** Nearest folder at or above `cwd` that holds a .git directory. */
+function gitRootOf(cwd: string): string | undefined {
+  let dir = cwd;
+  for (let i = 0; i < 30 && dir; i++) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    const parent = dir.replace(/\/[^/]+$/, "") || "/";
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
 }
 
 const sshCache = new Map<string, boolean>();

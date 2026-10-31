@@ -22,7 +22,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:sandbox": "SANDFIT_REAL_SANDBOX=1 vitest run test/sandbox",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "bench": "tsx bench/all.ts",
+    "bench:accuracy": "tsx bench/accuracy.ts",
+    "bench:perf": "tsx bench/perf.ts",
+    "bench:sandbox": "tsx bench/sandbox.ts"
   },
   "keywords": [
     "claude-code",

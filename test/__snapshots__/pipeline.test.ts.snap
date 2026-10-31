@@ -193,6 +193,7 @@ exports[`emitters > produce valid configs for every target > srt 1`] = `
     ],
   },
   "network": {
+    "allowLocalBinding": true,
     "allowedDomains": [
       "github.com",
       "registry.npmjs.org",

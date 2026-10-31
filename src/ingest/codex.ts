@@ -1,7 +1,7 @@
-import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { createInterface } from "node:readline";
+import { readLines } from "./lines.js";
 import type { AgentEvent } from "../types.js";
 
 export function codexSessionsDir(): string {
@@ -57,9 +57,8 @@ export async function parseCodexTranscript(file: string): Promise<AgentEvent[]> 
   const byCallId = new Map<string, AgentEvent>();
   let sessionId = "";
   let cwd = "";
-  const rl = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity });
 
-  for await (const line of rl) {
+  for await (const line of readLines(file)) {
     if (!line) continue;
     let entry: any;
     try {
