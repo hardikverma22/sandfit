@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Releases are published from GitHub Actions with npm provenance, so the npm page links each
+  version to the exact commit and workflow that built it.
+- The version lives only in `package.json`; the CLI reads it from there.
+
 ## 0.3.0 (2026-10-31)
 
 ### Added
