@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { expandHome } from "./extract/extract.js";
-import { generalizeWrite, isInside, tempRoots, tildify } from "./policy/paths.js";
+import { generalizeWrite, isInside, tempRoots, tildify, tooBroad } from "./policy/paths.js";
 import { redact } from "./redact.js";
 import type { AnalyzedEvent, Policy } from "./types.js";
 
@@ -11,6 +11,8 @@ import type { AnalyzedEvent, Policy } from "./types.js";
  */
 export interface SandboxModel {
   scope: "claude" | "process";
+  /** Project roots (always writable; used to word fixes). */
+  projects: string[];
   writeRoots: string[];
   denyRead: string[];
   denyWrite: string[];
@@ -18,6 +20,20 @@ export interface SandboxModel {
   localBinding: boolean;
   sockets: string[];
   excluded: string[];
+}
+
+/**
+ * Paths inside the working folder that sandbox-runtime (and so Claude Code's sandbox) never
+ * lets a sandboxed command write, whatever the configuration says. From sandbox-runtime's
+ * DANGEROUS_FILES / getDangerousDirectories / linuxGetCwdMandatoryDenyPaths.
+ */
+export const RUNTIME_PROTECTED = [
+  ".gitconfig", ".gitmodules", ".bashrc", ".bash_profile", ".zshrc", ".zprofile", ".profile", ".ripgreprc", ".mcp.json",
+  ".vscode", ".idea", ".claude/commands", ".claude/agents", ".git/hooks", ".git/config",
+];
+
+export function runtimeProtected(projects: string[]): string[] {
+  return projects.flatMap((p) => RUNTIME_PROTECTED.map((r) => `${p}/${r}`));
 }
 
 export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], home = homedir(), projects?: string[]): SandboxModel {
@@ -32,9 +48,10 @@ export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], ho
   }
   return {
     scope,
+    projects: projs,
     writeRoots,
     denyRead: policy.filesystem.denyRead.filter((p) => !p.includes("*")).flatMap(relToProjects),
-    denyWrite: policy.filesystem.denyWrite.flatMap(relToProjects),
+    denyWrite: [...policy.filesystem.denyWrite.flatMap(relToProjects), ...runtimeProtected(projs)],
     domains,
     localBinding: policy.network.allowLocalBinding,
     sockets: policy.network.allowUnixSockets,
@@ -42,9 +59,14 @@ export function modelFromPolicy(policy: Policy, scope: SandboxModel["scope"], ho
   };
 }
 
-/** The sandbox you get by switching it on with no extra configuration. */
-export function defaultModel(projects: string[], scope: SandboxModel["scope"] = "claude"): SandboxModel {
-  return { scope, writeRoots: [...projects, ...tempRoots()], denyRead: [], denyWrite: [], domains: [], localBinding: false, sockets: [], excluded: [] };
+/**
+ * The sandbox you get by switching it on with no extra configuration.
+ * On Linux (bubblewrap) every sandboxed command gets its own network namespace, so binding
+ * a local port always succeeds there (though nothing outside that command can reach it).
+ * On macOS (Seatbelt) binding needs allowLocalBinding. Verified against sandbox-runtime.
+ */
+export function defaultModel(projects: string[], scope: SandboxModel["scope"] = "claude", platform: NodeJS.Platform = process.platform): SandboxModel {
+  return { scope, projects: [...projects], writeRoots: [...projects, ...tempRoots()], denyRead: [], denyWrite: runtimeProtected(projects), domains: [], localBinding: platform === "linux", sockets: [], excluded: [] };
 }
 
 export function domainAllowed(host: string, patterns: string[]): boolean {
@@ -57,7 +79,7 @@ export function domainAllowed(host: string, patterns: string[]): boolean {
 
 export interface Blocker {
   key: string;
-  kind: "write" | "net" | "bind" | "socket" | "secret";
+  kind: "write" | "net" | "bind" | "socket" | "secret" | "exec";
   fix: string;
   count: number;
   examples: string[];
@@ -86,7 +108,7 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
   let bypassed = 0;
   let promptedBefore = 0;
   let promptsAvoided = 0;
-  const projects: string[] = [];
+  const projects = model.projects;
 
   const hit = (key: string, kind: Blocker["kind"], fix: string, example: string) => {
     const b = blockers.get(key) ?? { key, kind, fix, count: 0, examples: [] };
@@ -125,8 +147,10 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
         // the sandbox protects secrets from being read, not from being created.
         if (denied || !allowed) {
           blocked = true;
-          if (denied) hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (agent config or shell startup file)", example);
-          else {
+          if (denied) hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (agent config, git hooks/config or shell startup file); run it yourself outside the agent", example);
+          else if (tooBroad(n.value, home)) {
+            hit(`write:${tildify(n.value, home)}`, "write", "sandfit never grants this whole folder; have the agent write somewhere narrower", example);
+          } else {
             const g = generalizeWrite(n.value, home, projects) ?? n.value;
             hit(`write:${tildify(g, home)}`, "write", `allowWrite: ${tildify(g, home)}`, example);
           }
@@ -147,6 +171,10 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
           blocked = true;
           hit("bind:localhost", "bind", "allowLocalBinding: true", example);
         }
+      } else if (n.kind === "exec") {
+        // Not excluded (we returned above if it was), so it runs inside and fails.
+        blocked = true;
+        hit(`exec:${n.value}`, "exec", `excludedCommands: ${n.value} * (${n.reason})`, example);
       } else if (n.kind === "socket") {
         if (!model.sockets.includes(n.value)) {
           blocked = true;

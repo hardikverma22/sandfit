@@ -94,10 +94,13 @@ export function gitRoot(p: string): string | undefined {
 /**
  * Turn a concrete path an agent wrote to into the rule we would grant:
  * a known cache root, a repository root, or the containing directory. Returns undefined
- * when the path is already covered by the defaults (project or temp).
+ * when the path is already covered by the defaults (project or temp), or when it is a
+ * folder too broad to ever grant.
  */
 export function generalizeWrite(p: string, home: string, projects: string[]): string | undefined {
   if (projects.some((proj) => isInside(p, proj))) return undefined;
+  // Writing a broad folder itself (rm -rf ~/Downloads, touch ~) is never granted.
+  if (tooBroad(p, home)) return undefined;
   if (isTemp(p)) return undefined;
   for (const root of cacheRoots(home)) if (isInside(p, root)) return root;
 

@@ -96,7 +96,7 @@ describe("forecast", () => {
   it("shows the default sandbox breaking and the policy fixing it", async () => {
     const analyzed = await load("claude");
     const policy = buildPolicy(analyzed, { home: HOME, projects: ["/home/test/app"], now: NOW });
-    const before = forecast(analyzed, defaultModel(["/home/test/app"]), HOME);
+    const before = forecast(analyzed, defaultModel(["/home/test/app"], "claude", "darwin"), HOME);
     const after = forecast(analyzed, modelFromPolicy(policy, "claude", HOME, ["/home/test/app"]), HOME);
     expect(before.shellCalls).toBe(6);
     // npm install, git push, dev server, docker socket, write outside the project

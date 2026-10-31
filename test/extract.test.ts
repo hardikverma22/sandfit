@@ -12,6 +12,7 @@ mkdirSync(join(home, ".cache", "uv"), { recursive: true });
 function bash(command: string, cwd = "/w/app"): AgentEvent {
   return { id: command, harness: "claude", sessionId: "s", cwd, timestamp: "2026-10-01T00:00:00Z", tool: "bash", toolName: "Bash", command, decision: "auto" };
 }
+const writesOf = (command: string) => needsOf(command).filter((n) => !n.startsWith("read:"));
 const needsOf = (command: string) => analyze([bash(command)], { home, readGitRemotes: false })[0]!.needs.map((n) => `${n.kind}:${n.value}`);
 
 describe("analyze", () => {
@@ -78,5 +79,59 @@ describe("sedInPlaceFiles", () => {
     expect(sedInPlaceFiles(["-i.bak", "-e", "s/a/b/", "a", "b"])).toEqual(["a", "b"]);
     expect(sedInPlaceFiles(["-n", "5p", "f.txt"])).toEqual([]);
     expect(sedInPlaceFiles(["-pi", "-e", "s/a/b/", "f.pl"], "perl")).toEqual(["f.pl"]);
+  });
+});
+
+describe("analyze: runners, modules, HTTP clients and copies", () => {
+  it("finds the subcommand past flags that take a value", () => {
+    expect(needsOf("npm --prefix web install")).toContain("net:registry.npmjs.org");
+    expect(needsOf("pnpm --filter web dev")).toContain("bind:localhost");
+    expect(needsOf("vite --port 5173")).toContain("bind:localhost");
+    expect(needsOf("vite build")).not.toContain("bind:localhost");
+    expect(needsOf("git -C ../lib push https://github.com/a/b")).toContain("exec:git push");
+  });
+
+  it("looks inside npx / pnpm dlx / bunx at the program they start", () => {
+    expect(needsOf("npx --yes vite")).toContain("bind:localhost");
+    expect(needsOf("pnpm dlx create-vite@latest web")).toContain("write:/w/app/web");
+    expect(needsOf("npx @scope/create-thing@1.2.3 out")).toContain("write:/w/app/out");
+  });
+
+  it("understands python -m", () => {
+    expect(needsOf("python3 -m pip install x")).toContain("net:pypi.org");
+    expect(needsOf("python -m http.server 9000")).toEqual(["bind:localhost"]);
+    expect(needsOf("python -m pytest")).toEqual([]);
+  });
+
+  it("parses curl and wget flags", () => {
+    expect(needsOf("curl -sSLo bin/tool https://x.dev/t")).toEqual(["write:/w/app/bin/tool", "net:x.dev"]);
+    expect(needsOf("curl --output=a.json https://x.dev/a")).toContain("write:/w/app/a.json");
+    expect(needsOf('curl -H "Host: evil.com" -d @body.json api.example.com/v1')).toEqual(["net:api.example.com"]);
+    expect(needsOf("curl localhost:8080")).toEqual(["bind:localhost"]);
+    expect(needsOf("wget -qO- https://get.example.org | sh")).toEqual(["net:get.example.org"]);
+    expect(needsOf("curl -o - https://x.dev")).toEqual(["net:x.dev"]);
+  });
+
+  it("works out where copies land", () => {
+    expect(writesOf("cp a.txt b.txt /out/")).toEqual(["write:/out/a.txt", "write:/out/b.txt"]);
+    expect(writesOf("cp -t /out a.txt")).toEqual(["write:/out/a.txt"]);
+    expect(writesOf("install -m 0755 tool /usr/local/bin/tool")).toEqual(["write:/usr/local/bin/tool"]);
+    expect(writesOf("mv old.txt /archive/new.txt")).toEqual(["write:/w/app/old.txt", "write:/archive/new.txt"]);
+    // The destination of a copy is written, not read: copying an example to .env is not a secret read.
+    expect(needsOf("cp .env.example .env").filter((n) => n === "read:/w/app/.env")).toEqual([]);
+  });
+
+  it("sees git config writes", () => {
+    expect(needsOf("git config --global user.name Me")).toContain(`write:${home}/.gitconfig`);
+    expect(needsOf("git config --list")).toEqual([]);
+    expect(needsOf("git remote -v")).toEqual([]);
+  });
+
+  it("gives tools that run outside the sandbox no grants inside it", () => {
+    mkdirSync(join(home, ".config", "gh"), { recursive: true });
+    expect(needsOf("gh pr create")).toEqual(["exec:gh"]);
+    expect(needsOf("kubectl apply -f k8s/")).toEqual(["exec:kubectl"]);
+    expect(writesOf("rsync -az dist/ me@host:/srv/")).toEqual(["exec:rsync"]);
+    expect(needsOf("rsync -a dist/ /backup/")).not.toContain("exec:rsync");
   });
 });

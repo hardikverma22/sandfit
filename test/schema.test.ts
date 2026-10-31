@@ -5,7 +5,8 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 import { toClaudeSettings } from "../src/emit/claude.js";
-import { toNonoProfile } from "../src/emit/others.js";
+import { SandboxRuntimeConfigSchema } from "@anthropic-ai/sandbox-runtime";
+import { toNonoProfile, toSrtSettings } from "../src/emit/others.js";
 import { analyze } from "../src/extract/extract.js";
 import { ingest } from "../src/ingest/index.js";
 import { buildPolicy } from "../src/policy/build.js";
@@ -42,5 +43,10 @@ describe("emitted configs match the tools' published schemas", () => {
     const ok = validate(toNonoProfile(await policy()));
     expect(validate.errors ?? []).toEqual([]);
     expect(ok).toBe(true);
+  });
+
+  it("sandbox-runtime settings (validated with srt's own schema)", async () => {
+    const r = SandboxRuntimeConfigSchema.safeParse(toSrtSettings(await policy()));
+    expect(r.success ? [] : r.error.issues).toEqual([]);
   });
 });

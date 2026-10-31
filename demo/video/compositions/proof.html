@@ -1,0 +1,74 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 80px;
+    }
+    #proof-title {
+      font-size: 64px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      text-align: center;
+    }
+    #proof-title span {
+      color: var(--dim);
+      font-weight: 400;
+    }
+    #proof-stats {
+      display: flex;
+      gap: 110px;
+    }
+    .proof-stat {
+      text-align: center;
+      width: 420px;
+    }
+    .proof-num {
+      font-size: 150px;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      color: var(--ok);
+      line-height: 1;
+    }
+    .proof-label {
+      margin-top: 22px;
+      font-size: 30px;
+      color: var(--ink);
+      line-height: 1.35;
+    }
+    .proof-label small {
+      display: block;
+      color: var(--dim);
+      font-size: 28px;
+      margin-top: 8px;
+    }
+  </style>
+  <div id="root" data-composition-id="proof" data-width="1920" data-height="1080">
+    <div id="proof-title">Tested against a real sandbox<br /><span>not just its own model</span></div>
+    <div id="proof-stats">
+      <div class="proof-stat">
+        <div class="proof-num">26/26</div>
+        <div class="proof-label">attacks blocked, needs allowed<small>run under Anthropic's sandbox-runtime</small></div>
+      </div>
+      <div class="proof-stat">
+        <div class="proof-num">36/36</div>
+        <div class="proof-label">forecasts matched the real sandbox<small>with and without the policy</small></div>
+      </div>
+      <div class="proof-stat">
+        <div class="proof-num">96%</div>
+        <div class="proof-label">accuracy on commands it was never tuned on<small>precision and recall, 64 labelled commands</small></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#proof-title", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 0.15);
+    tl.fromTo(".proof-stat", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, stagger: 0.25, ease: "expo.out" }, 0.5);
+    tl.to("#root > *", { opacity: 0, filter: "blur(8px)", duration: 0.18, stagger: 0.03, ease: "power3.in" }, 4.75);
+    window.__timelines["proof"] = tl;
+  </script>
+</template>

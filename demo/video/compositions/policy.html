@@ -1,0 +1,91 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 64px;
+    }
+    #pol-title {
+      font-size: 68px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    #pol-title em {
+      font-style: normal;
+      color: var(--ok);
+    }
+    #pol-cols {
+      display: flex;
+      gap: 120px;
+    }
+    .pol-col h3 {
+      font-size: 30px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 26px;
+    }
+    #pol-allow h3 {
+      color: var(--ok);
+    }
+    #pol-deny h3 {
+      color: var(--bad);
+    }
+    .pol-item {
+      font-family: var(--font-mono);
+      font-size: 34px;
+      line-height: 1.75;
+      white-space: nowrap;
+    }
+    .pol-item b {
+      display: inline-block;
+      width: 46px;
+      font-weight: 400;
+    }
+    #pol-allow .pol-item b {
+      color: var(--ok);
+    }
+    #pol-deny .pol-item b {
+      color: var(--bad);
+    }
+    .pol-item small {
+      font-size: 28px;
+      color: var(--dim);
+      margin-left: 14px;
+    }
+  </style>
+  <div id="root" data-composition-id="policy" data-width="1920" data-height="1080">
+    <div id="pol-title">Only what you <em>actually used</em>.</div>
+    <div id="pol-cols">
+      <div class="pol-col" id="pol-allow">
+        <h3>Allowed</h3>
+        <div class="pol-item"><b>✓</b>registry.npmjs.org<small>npm, npx ×44</small></div>
+        <div class="pol-item"><b>✓</b>github.com<small>git pull ×11</small></div>
+        <div class="pol-item"><b>✓</b>api.vercel.com<small>vercel --prod ×2</small></div>
+        <div class="pol-item"><b>✓</b>~/.npm, ~/notes<small>caches and folders</small></div>
+        <div class="pol-item"><b>✓</b>local dev servers<small>npm run dev</small></div>
+      </div>
+      <div class="pol-col" id="pol-deny">
+        <h3>Always denied</h3>
+        <div class="pol-item"><b>✗</b>~/.ssh, ~/.aws<small>your keys</small></div>
+        <div class="pol-item"><b>✗</b>.env.local<small>project secrets</small></div>
+        <div class="pol-item"><b>✗</b>~/.zshrc<small>shell startup</small></div>
+        <div class="pol-item"><b>✗</b>.git/hooks<small>code that runs later</small></div>
+        <div class="pol-item"><b>✗</b>.claude/settings.json<small>its own sandbox</small></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#pol-title", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 0.15);
+    tl.fromTo(".pol-col h3", { opacity: 0 }, { opacity: 1, duration: 0.3, stagger: 0.15, ease: "power2.out" }, 0.6);
+    tl.fromTo("#pol-allow .pol-item", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.45, stagger: 0.12, ease: "expo.out" }, 0.9);
+    tl.fromTo("#pol-deny .pol-item", { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.45, stagger: 0.12, ease: "expo.out" }, 1.9);
+    tl.to("#root > *", { opacity: 0, filter: "blur(8px)", duration: 0.22, stagger: 0.05, ease: "power3.in" }, 5.2);
+    window.__timelines["policy"] = tl;
+  </script>
+</template>

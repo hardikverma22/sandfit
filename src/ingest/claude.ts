@@ -1,7 +1,7 @@
-import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
+import { readLines } from "./lines.js";
 import type { AgentEvent, Decision, ToolKind } from "../types.js";
 
 export function claudeProjectsDir(): string {
@@ -59,9 +59,8 @@ interface PendingUse {
 export async function parseClaudeTranscript(file: string): Promise<AgentEvent[]> {
   const pending = new Map<string, PendingUse>();
   const events: AgentEvent[] = [];
-  const rl = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity });
 
-  for await (const line of rl) {
+  for await (const line of readLines(file)) {
     if (!line || (!line.includes("tool_use") && !line.includes("tool_result"))) continue;
     let entry: any;
     try {

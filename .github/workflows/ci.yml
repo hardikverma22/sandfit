@@ -19,8 +19,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      # Unit, CLI, property and accuracy tests, with coverage floors.
+      - run: npm run test:coverage
       - run: npm run build
+      - run: node dist/cli.js --version
+      # Smoke-test performance so a slow regression is noticed.
+      - run: npm run bench:perf -- --sizes 1000,10000
 
   real-sandbox:
     # The forecast is only worth something if it matches a real sandbox.
@@ -38,7 +42,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap socat ripgrep
-          # Ubuntu 24.04 restricts unprivileged user namespaces, which bubblewrap needs
+          # Ubuntu 24.04+ strips capabilities from unprivileged user namespaces, which bubblewrap needs
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_unconfined=0 || true
+          # Ubuntu 25.04+ also confines namespaces created inside bubblewrap (bwrap-userns-restrict),
+          # which breaks sandbox-runtime's nested seccomp helper. Unload that profile on the runner.
+          for f in /etc/apparmor.d/bwrap-userns-restrict /etc/apparmor.d/unprivileged_userns; do
+            if [ -f "$f" ]; then echo "unloading $f"; sudo apparmor_parser -R "$f" || true; fi
+          done
+          grep -h . /proc/sys/kernel/apparmor_restrict_unprivileged_* 2>/dev/null || true
       - run: npm ci
       - run: npm run test:sandbox

@@ -6,7 +6,7 @@ import { defaultModel, type SandboxModel } from "./forecast.js";
 
 /** Claude Code settings files that apply to a project, lowest precedence first. */
 export function claudeSettingsFiles(project: string, home = homedir()): string[] {
-  const userDir = process.env.CLAUDE_CONFIG_DIR ?? join(home, ".claude");
+  const userDir = process.env.CLAUDE_CONFIG_DIR || join(home, ".claude");
   return [join(userDir, "settings.json"), join(project, ".claude", "settings.json"), join(project, ".claude", "settings.local.json")];
 }
 

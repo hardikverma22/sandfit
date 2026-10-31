@@ -1,0 +1,59 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 34px;
+    }
+    .hook-line {
+      font-size: 84px;
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1.1;
+    }
+    .hook-line span {
+      display: inline-block;
+    }
+    #hook-off {
+      color: var(--bad);
+    }
+    #hook-why {
+      display: flex;
+      gap: 44px;
+      font-family: var(--font-mono);
+      font-size: 34px;
+      color: var(--dim);
+      margin-top: 30px;
+    }
+    #hook-why span b {
+      color: var(--bad);
+      font-weight: 400;
+    }
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1920" data-height="1080">
+    <div class="hook-line" id="hook-l1">
+      <span>Your</span> <span>coding</span> <span>agent</span> <span>has</span> <span>a</span> <span>sandbox.</span>
+    </div>
+    <div class="hook-line" id="hook-l2">
+      <span>You</span> <span>turned</span> <span>it</span> <span id="hook-off">off.</span>
+    </div>
+    <div id="hook-why">
+      <span><b>✗</b> npm install</span>
+      <span><b>✗</b> git push</span>
+      <span><b>✗</b> npm run dev</span>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Line one is already on screen (dim) at 0 s, so the first frame is not empty; words light up to ink.
+    tl.fromTo("#hook-l1 span", { opacity: 0.28 }, { opacity: 1, duration: 0.12, stagger: 0.08, ease: "power2.out" }, 0.2);
+    tl.fromTo("#hook-l2 span", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, stagger: 0.09, ease: "power4.out" }, 1.45);
+    tl.fromTo("#hook-why span", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.12, ease: "expo.out" }, 2.35);
+    tl.to("#root > *", { opacity: 0, filter: "blur(8px)", duration: 0.2, stagger: 0.04, ease: "power3.in" }, 4.2);
+    window.__timelines["hook"] = tl;
+  </script>
+</template>

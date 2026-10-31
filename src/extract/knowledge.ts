@@ -14,7 +14,7 @@ export interface ToolKnowledge {
   writes?: string[];
   /** Unix sockets the tool needs. */
   sockets?: string[];
-  /** Subcommands that start a server listening on a local port. */
+  /** Subcommands that start a server listening on a local port ("" = no subcommand, "*" = always). */
   bindSubcommands?: string[];
   /** The tool cannot run inside an OS sandbox at all; suggest excluding it. */
   exclude?: string;
@@ -66,7 +66,13 @@ export const KNOWLEDGE: Record<string, ToolKnowledge> = {
   playwright: { hosts: ["cdn.playwright.dev", "playwright.download.prss.microsoft.com"], netSubcommands: ["install"], writes: ["~/Library/Caches/ms-playwright", "~/.cache/ms-playwright"] },
   docker: { sockets: ["/var/run/docker.sock"], exclude: "needs the Docker daemon socket, which a sandbox cannot safely expose" },
   podman: { exclude: "needs the container runtime outside the sandbox" },
-  kubectl: { writes: ["~/.kube"] },
+  kubectl: { exclude: "uses your cluster credentials in ~/.kube/config, which the sandbox keeps unreadable" },
+  helm: { exclude: "uses your cluster credentials in ~/.kube/config, which the sandbox keeps unreadable" },
+  "apt-get": { exclude: "installs system packages as root, which a sandbox cannot allow" },
+  apt: { exclude: "installs system packages as root, which a sandbox cannot allow" },
+  dnf: { exclude: "installs system packages as root, which a sandbox cannot allow" },
+  yum: { exclude: "installs system packages as root, which a sandbox cannot allow" },
+  pacman: { exclude: "installs system packages as root, which a sandbox cannot allow" },
   terraform: { hosts: ["registry.terraform.io", "releases.hashicorp.com"], netSubcommands: ["init", "plan", "apply", "destroy", "get", "providers"], writes: ["~/.terraform.d"] },
   aws: { hosts: ["amazonaws.com"], exclude: "uses your cloud credentials; run it outside the sandbox or through a broker" },
   gcloud: { hosts: ["googleapis.com"], exclude: "uses your cloud credentials; run it outside the sandbox or through a broker" },
@@ -74,6 +80,7 @@ export const KNOWLEDGE: Record<string, ToolKnowledge> = {
   ssh: { exclude: "needs your SSH keys, which the sandbox protects" },
   scp: { exclude: "needs your SSH keys, which the sandbox protects" },
   rsync: {},
+  prisma: { hosts: ["binaries.prisma.sh"], netSubcommands: ["generate", "migrate", "db", "init"], writes: ["~/.cache/prisma"], bindSubcommands: ["studio"] },
   ollama: { hosts: ["registry.ollama.ai"], netSubcommands: ["pull", "push", "run"], writes: ["~/.ollama"] },
   next: { bindSubcommands: ["dev", "start"] },
   vite: { bindSubcommands: ["", "dev", "preview", "serve"] },
@@ -81,10 +88,10 @@ export const KNOWLEDGE: Record<string, ToolKnowledge> = {
   nuxt: { bindSubcommands: ["dev", "preview"] },
   remix: { bindSubcommands: ["dev"] },
   expo: { hosts: ["exp.host", "api.expo.dev"], bindSubcommands: ["start", "run"] },
-  "http-server": { bindSubcommands: [""] },
-  serve: { bindSubcommands: [""] },
-  uvicorn: { bindSubcommands: [""] },
-  gunicorn: { bindSubcommands: [""] },
+  "http-server": { bindSubcommands: ["*"] },
+  serve: { bindSubcommands: ["*"] },
+  uvicorn: { bindSubcommands: ["*"] },
+  gunicorn: { bindSubcommands: ["*"] },
   flask: { bindSubcommands: ["run"] },
   rails: { bindSubcommands: ["server", "s"] },
   jekyll: { bindSubcommands: ["serve", "s"] },

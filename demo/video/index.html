@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --ground: #0b0d10;
+        --panel: #12161c;
+        --line: #232a33;
+        --ink: #e8eaed;
+        --dim: #8a94a3;
+        --ok: #3ddc84;
+        --bad: #ff5d5d;
+        --warn: #ffb547;
+        --font-display: "Inter", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        font-family: var(--font-display);
+        color: var(--ink);
+      }
+      #bg {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(1200px 700px at 50% 40%, #151b23 0%, var(--ground) 70%);
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      sandfit demo: 29 s, with a music bed and a few sound effects (the README GIF is the silent cut).
+      Scenes: hook -> real CLI output -> what the policy allows -> proof -> how to start.
+      Terminal text is real output of `sandfit` on demo/sample-history.ts; numbers come from BENCHMARKS.md.
+    -->
+    <div id="root" data-composition-id="main" data-start="0" data-duration="29" data-width="1920" data-height="1080">
+      <div id="bg"></div>
+      <div id="hook" data-composition-id="hook" data-composition-src="compositions/hook.html" data-start="0" data-duration="4.6" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="terminal" data-composition-id="terminal" data-composition-src="compositions/terminal.html" data-start="4.6" data-duration="9.4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="policy" data-composition-id="policy" data-composition-src="compositions/policy.html" data-start="14" data-duration="5.6" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="proof" data-composition-id="proof" data-composition-src="compositions/proof.html" data-start="19.6" data-duration="5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="cta" data-composition-id="cta" data-composition-src="compositions/cta.html" data-start="24.6" data-duration="4.4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!--
+        Sound. Music: HeyGen music library (fetched by fetch-audio.sh). Effects: HyperFrames' bundled
+        Pixabay-licensed set. Each effect is placed so its measured peak lands one frame after its picture.
+      -->
+      <audio id="bgm" class="clip" src="assets/bgm/track.mp3" data-start="0" data-duration="29" data-track-index="10" data-volume="0.841395" data-fade-in="0.4" data-fade-out="2"></audio>
+      <audio id="sfx-cut-1" class="clip" src="assets/sfx/whoosh.mp3" data-start="4.47" data-duration="0.575" data-track-index="11" data-volume="0.73"></audio>
+      <audio id="sfx-typing" class="clip" src="assets/sfx/typing.mp3" data-start="5.12" data-duration="0.8" data-track-index="12" data-volume="1.2" data-fade-out="0.15"></audio>
+      <audio id="sfx-break" class="clip" src="assets/sfx/error.mp3" data-start="5.99" data-duration="1.62" data-track-index="13" data-volume="2.66"></audio>
+      <audio id="sfx-cut-2" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="13.87" data-duration="0.575" data-track-index="11" data-volume="0.67"></audio>
+      <audio id="sfx-cut-3" class="clip" src="assets/sfx/whoosh.mp3" data-start="19.47" data-duration="0.575" data-track-index="11" data-volume="0.67"></audio>
+      <audio id="sfx-stat-1" class="clip" src="assets/sfx/pop.mp3" data-start="20.16" data-duration="0.72" data-track-index="14" data-volume="0.8"></audio>
+      <audio id="sfx-stat-2" class="clip" src="assets/sfx/ping.mp3" data-start="20.21" data-duration="1.32" data-track-index="15" data-volume="0.6"></audio>
+      <audio id="sfx-stat-3" class="clip" src="assets/sfx/pop.mp3" data-start="20.66" data-duration="0.72" data-track-index="17" data-volume="0.8"></audio>
+      <audio id="sfx-mark" class="clip" src="assets/sfx/impact-bass-1.mp3" data-start="24.66" data-duration="2.116" data-track-index="16" data-volume="0.93"></audio>
+    </div>
+    <script>
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

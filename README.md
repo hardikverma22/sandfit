@@ -1,115 +1,202 @@
 <h1 align="center">sandfit</h1>
 
 <p align="center">
-  <b>Turn on your coding agent's sandbox without breaking your workflow.</b><br>
-  sandfit reads the Claude Code and Codex history already on your machine and writes a<br>
-  least-privilege sandbox policy that fits how you actually work.
+  <b>Turn on your coding agent's sandbox without breaking your work.</b><br>
+  sandfit looks at what your agent (Claude Code or Codex) already did on your machine,<br>
+  and writes sandbox rules that allow exactly that, and nothing more.
 </p>
 
 <p align="center">
-  <a href="#install"><img alt="npx sandfit" src="https://img.shields.io/badge/npx-sandfit-black"></a>
+  <img alt="npx sandfit" src="https://img.shields.io/badge/npx-sandfit-black">
   <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="local only" src="https://img.shields.io/badge/your%20history-never%20leaves%20your%20machine-green">
 </p>
 
-```console
-$ npx sandfit
+<p align="center">
+  <a href="demo/sandfit-demo.mp4"><img src="demo/sandfit-demo.gif" alt="sandfit demo: the sandbox would break 28% of commands today; with the sandfit policy, 0% of unseen commands break, secrets stay blocked" width="860"></a>
+  <br><sub><b><a href="demo/sandfit-demo.mp4">▶ Watch with sound (MP4, 29 s)</a></b> · made with <a href="https://github.com/heygen-com/hyperframes">HyperFrames</a> · the terminal shows real sandfit output on a <a href="demo/sample-history.ts">sample history</a></sub>
+</p>
 
-sandfit 0.1.0  ·  read 18,634 tool calls from 40 sessions (Claude Code)
+## The problem, in one minute
 
-  If you turn on the sandbox today
-  ████████░░░░░░░░░░░░░░░░  32% of your shell commands would break  (2,731 of 8,423)
+Coding agents run commands on your computer: `npm install`, `git push`, `curl`, scripts.
+If an agent is tricked (for example by a malicious README or web page), those same commands
+could read your SSH keys or send your `.env` file somewhere.
 
-  With the sandfit policy
-  ░░░░░░░░░░░░░░░░░░░░░░░░  0.3% would break on history it never saw
-  53 commands that read secrets are blocked on purpose
-  Manual approvals you would no longer need: 15 of 15
+A **sandbox** stops that. Claude Code has one (`/sandbox`), and so do Codex and other tools.
+A sandbox blocks everything by default, so you have to tell it what is allowed: which
+websites, which folders.
 
-  What the policy allows
-  Network   registry.npmjs.org, github.com, pypi.org, api.vercel.com +32 more
-  Writes    your project, temp, ~/.npm, ~/.cache/uv +12 more
-  Outside   gh, git push run unsandboxed
-  Denied    secrets (~/.ssh, ~/.aws, .env …) and the agent's own config
+Nobody knows that list up front. So people turn the sandbox on, `npm install` fails, the
+dev server fails, approvals pile up, and they turn it off again.
 
-  Next
-  sandfit apply                    write it to .claude/settings.json (keeps a backup)
-```
+**sandfit writes that list for you.** Your agent's history already shows what you really use.
+sandfit reads it, builds the rules, and shows you what would still break *before* you switch anything on.
 
-<sub>Real output from one developer's last month of Claude Code use. Your numbers will differ: run it.</sub>
+## Quick start
 
-## Why
-
-Every coding agent now ships a sandbox: Claude Code's `/sandbox`, Codex's `workspace-write`, [Anthropic's sandbox-runtime](https://github.com/anthropics/sandbox-runtime), [nono](https://nono.sh), [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell). They are deny-by-default, so they all ask the same question: **which domains and paths should I allow?**
-
-Nobody knows the answer up front. So people turn the sandbox on, watch `npm install` fail and the permission prompts pile up, and turn it off again, or add broad allow rules that quietly bypass it.
-
-You already have the answer. It is in your agent's history: every command it ran, every file it wrote, every host it reached. sandfit turns that history into a policy, and **shows you what would break before you switch anything on**.
-
-## Install
+You need Node.js 20 or newer. In your project folder, run:
 
 ```bash
 npx sandfit
 ```
 
-Node 20 or newer. Nothing is installed globally and nothing is sent anywhere: sandfit reads `~/.claude/projects` and `~/.codex/sessions` locally and prints to your terminal.
+That only reads and prints. Nothing is changed, and nothing is sent anywhere.
 
-## What it does
+If you like what you see, write the rules into your project's Claude Code settings
+(sandfit asks first and keeps a backup of the old file):
 
-1. **Reads your history.** It covers Claude Code transcripts (including subagents) and Codex rollouts, for the last 30 days by default.
-2. **Works out what each action needed.** It parses every shell command (pipes, `cd`, heredocs, `bash -c`, `sudo`, redirects). A knowledge base of developer tools fills in what transcripts don't show: `npm install` talks to `registry.npmjs.org` and writes `~/.npm`, `git push` needs your credentials, `pnpm dev` binds a local port.
-3. **Builds a reviewable policy.** It generalizes paths to cache roots and repositories, never to `~` or `~/Library`. It always denies secrets (`~/.ssh`, `~/.aws`, `.env`, keychains), and blocks writes to the agent's own config and your shell startup files, so a hijacked agent cannot loosen its own sandbox.
-4. **Forecasts the result.** It replays your history against today's sandbox and against the new policy. It also gives an honest number: the policy is built from your older history and tested on your newest 20%, which it never saw.
-5. **Writes it for your sandbox**, keeping a backup of anything it changes.
+```bash
+npx sandfit apply
+```
 
-## Targets
+Then turn the sandbox on in Claude Code with `/sandbox`.
+
+## What the output means
+
+This is real output on the [sample history](demo/sample-history.ts) used in the video
+(one week of a developer working on a Next.js app):
+
+```text
+sandfit 0.1.0  ·  read 243 tool calls from 12 sessions (Claude Code) · last 30 days
+  project ~/code/storefront
+
+  If you turn on the sandbox today
+  ███████░░░░░░░░░░░░░░░░░  28% of your shell commands would break  (69 of 243)
+
+  With the sandfit policy
+  ░░░░░░░░░░░░░░░░░░░░░░░░  0% would break  (0 of 49 commands from your newest 20% of history, which the policy never saw)
+  On the history it was built from: 0%
+  2 commands that read secrets are blocked on purpose
+  Manual approvals you would no longer need: 24 of 35
+  11 commands run outside the sandbox (tools that cannot work inside it)
+
+  What the policy allows
+  Network   api.github.com, api.vercel.com, binaries.prisma.sh, cdn.playwright.dev, files.pythonhosted.org, github.com +4 more
+  Writes    your project, temp, ~/.cache/ms-playwright, ~/.cache/pip, ~/.npm, ~/notes
+  Servers   local dev servers may listen on ports
+  Outside   docker, gh, git push run unsandboxed
+  Denied    secrets (~/.ssh, ~/.aws, .env …) and the agent's own config
+```
+
+Line by line:
+
+- **If you turn on the sandbox today**: how many of your past commands would fail with the sandbox on and no rules.
+- **With the sandfit policy**: how many would still fail with sandfit's rules. This is an honest test: sandfit builds the rules from your *older* history and checks them on your *newest* 20%, which it did not look at.
+- **Blocked on purpose**: commands that read secrets (here, `cat .env.local`). The sandbox should block those.
+- **Manual approvals you would no longer need**: commands you had to approve by hand that the sandbox now allows safely.
+- **Run outside the sandbox**: tools that cannot work inside a sandbox at all (Docker needs its daemon, `git push` and `gh` need your credentials). They are listed openly, so they keep asking you for approval.
+
+Want to know why something is allowed? Ask:
+
+```bash
+npx sandfit explain github.com
+```
+
+```text
+  Network: hosts your agent's commands reached
+  ✓ github.com  needed 11 times
+      e.g. git pull --rebase
+  ✓ api.github.com  needed 2 times
+      e.g. curl -s https://api.github.com/repos/vercel/next.js/releases/latest
+```
+
+## How it works
+
+1. **Read your history.** Claude Code keeps transcripts in `~/.claude/projects`, Codex in `~/.codex/sessions`. sandfit reads the last 30 days of the current project, on your machine.
+2. **Work out what each command needed.** It understands shell syntax (pipes, `cd`, `bash -c`, `sudo`, redirects, heredocs) and knows what common tools need behind the scenes: `npm install` talks to `registry.npmjs.org` and writes `~/.npm`; `pnpm dev` starts a local server; `git push` needs your SSH keys.
+3. **Build the rules.** Only what was used, generalized carefully (a cache folder, not your whole home). Secrets are always denied, and so is the agent's own config, so a hijacked agent cannot switch its sandbox off.
+4. **Check them.** It replays your history against the sandbox with and without the rules and shows you the difference.
+5. **Write them** for the sandbox you use, keeping a backup.
+
+## Which sandboxes it supports
 
 | Sandbox | Command | What you get |
 |---|---|---|
-| **Claude Code** `/sandbox` | `sandfit apply` | `sandbox.network`, `sandbox.filesystem`, `excludedCommands` and secret `deny` rules merged into `.claude/settings.json` |
+| **Claude Code** `/sandbox` | `sandfit apply` | Sandbox rules and secret `deny` rules merged into `.claude/settings.json` (add `--user` for `~/.claude/settings.json`) |
 | **Anthropic sandbox-runtime** (`srt`) | `sandfit apply -t srt` | `~/.srt-settings.json`, then run `srt claude` |
-| **Codex CLI** | `sandfit apply -t codex` | `sandbox_mode = "workspace-write"` with `writable_roots` and network, or `--codex-profile` for per-domain rules |
+| **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml` (`--codex-profile` for per-website rules) |
 | **nono** | `sandfit apply -t nono` | `~/.config/nono/profiles/sandfit.json`, then run `nono run --profile sandfit -- claude` |
-| **Anything else** | `sandfit emit -t policy` | The policy as YAML, with how often each grant was needed and an example |
+| **Anything else** | `sandfit emit -t policy` | The rules as a YAML file, with how often each one was needed and an example |
 
-Preview any target without writing anything:
-
-```bash
-sandfit emit -t claude      # or srt, codex, nono, policy
-```
-
-## Commands
+To see a config without writing it, use `emit` instead of `apply`:
 
 ```bash
-sandfit                       # summary: what breaks today, what breaks with the policy
-sandfit forecast              # every blocked command, grouped, with the one-line fix
-sandfit emit -t <target>      # print the config
-sandfit apply -t <target>     # write it (asks first, keeps a backup)
+npx sandfit emit -t claude      # or srt, codex, nono, policy
 ```
 
-Useful options: `--all` (every project, not just this repo), `--days 90`, `--harness claude`, `--min-count 2` (drop one-off grants), `--holdout 0.3`, `--json`.
+## All commands
 
-## What sandfit will not do
+```bash
+sandfit                     # summary: what breaks today, what breaks with the rules
+sandfit forecast            # every command that would be blocked, grouped, with the fix
+sandfit explain [text]      # why each rule exists: how often it was needed, one example
+sandfit emit -t <target>    # print the config (claude, srt, codex, nono, policy)
+sandfit apply -t <target>   # write it (asks first, keeps a backup)
+```
 
-- **Loosen your permissions.** It only adds sandbox grants and secret *deny* rules. Allow rules for WebFetch domains, edit paths and MCP tools are opt-in with `--with-permissions`.
-- **Grant broad paths.** Never `~`, `/`, `~/Library`, `~/Documents`, a cache parent, or a repo that contains your project.
-- **Hide trade-offs.** If a tool you use needs a secret (for example, npm reads `~/.npmrc`), sandfit leaves that one file readable and tells you why. Tools that cannot work sandboxed (`docker`, `gh`, `git push` over SSH, cloud CLIs) are listed as running outside the sandbox, not silently allowed inside it.
-- **Send your history anywhere.** No network calls, no telemetry. Credentials found in examples are redacted before they reach the policy file.
+Options that work everywhere:
 
-## How accurate is it?
+| Option | What it does |
+|---|---|
+| `--all` | Use the history of every project, not just this one |
+| `--project <dir>` | Build the rules for this folder |
+| `--days <n>` | How far back to look (default 30; `0` = everything) |
+| `--harness claude` / `codex` | Only read one agent's history |
+| `--min-count <n>` | Leave out anything used fewer than `n` times |
+| `--holdout <fraction>` | How much of the newest history to hold back for the honest test (default `0.2`) |
+| `--json` | Machine-readable output |
 
-sandfit is tested against a **real** sandbox, not just its own model. The end-to-end suite (`npm run test:sandbox`) does three things:
+## Promises
 
-1. It builds a policy from sample history and runs it under Anthropic's sandbox-runtime (Seatbelt on macOS, bubblewrap on Linux).
-2. It checks that everything the history needed still works, and that reading a planted fake SSH key or `.env`, writing outside the project, editing `~/.zshrc`, and reaching unknown hosts all fail.
-3. It checks that sandfit's forecast matches what the sandbox actually did, probe by probe.
+sandfit will **not**:
 
-**Known limits.** Transcripts show commands, not everything a command does inside. A script that calls an API sandfit has never heard of won't be in the policy until you run it once under the sandbox. sandfit lists those tools as "side effects unverified" so you know where to look.
+- **Send your history anywhere.** No network calls, no telemetry. Anything that looks like a password or token is masked before it is printed or written.
+- **Loosen your permissions.** It adds sandbox rules and secret *deny* rules. Extra allow rules for Claude Code's own tools are only added with `--with-permissions`.
+- **Overwrite your settings.** It merges: your own values win, and a timestamped backup is kept. If your settings file is broken, it stops instead of replacing it.
+- **Allow broad folders.** Never `~`, `/`, `~/Documents`, `~/Downloads`, `~/Library`, `~/.config` or a parent of your project.
+- **Hide trade-offs.** If a tool needs a secret file (npm reads `~/.npmrc`), sandfit leaves that one file readable and tells you why.
+
+## How do we know it works?
+
+Every number below comes from code in [`bench/`](bench) and is in [BENCHMARKS.md](BENCHMARKS.md). Run `npm run bench` to check it on your machine.
+
+- **Against a real sandbox.** sandfit's rules were run inside [Anthropic's sandbox-runtime](https://github.com/anthropics/sandbox-runtime) (bubblewrap on Linux, Seatbelt on macOS) with 26 probes: things the history needed (should work) and attacks like reading a planted fake SSH key, editing `~/.zshrc`, writing git hooks or calling an unknown website (should be blocked). **26 of 26** behaved correctly, and sandfit's forecast matched the real sandbox on **36 of 36** checks. This runs in CI on Linux and macOS.
+- **Understanding commands.** On 64 hand-labelled commands that sandfit was *not* tuned on, it found what they need with **96% precision and 96% recall**. (On the 143 commands it was tuned on: 100% and 99.5%.) The misses are listed in BENCHMARKS.md.
+- **Speed.** 100,000 tool calls (1.3 GB of transcripts) in about 5 seconds. A heavy month of real use is around 18,000 tool calls: about a second.
+
+## Known limits
+
+- sandfit sees **commands**, not everything a command does inside. If a script calls an API sandfit has never heard of, that website is not in the rules until you run it once with the sandbox on. sandfit lists such tools under "Tools sandfit has no knowledge of".
+- On **Linux**, every sandboxed command gets its own network, so a dev server started by one command cannot be reached by the next. That is how the sandbox works there, not something sandfit can change.
+- The Codex and nono configs are checked against those tools' published schemas, but only sandbox-runtime (which Claude Code's sandbox is built on) is tested by actually running commands.
+
+## Questions
+
+**Do I need to install anything?** No. `npx sandfit` downloads and runs it. Node.js 20+ is the only requirement.
+
+**Can I undo `apply`?** Yes. Every write keeps a copy of the old file next to it (`settings.json.sandfit-backup-<time>`). Copy it back.
+
+**I use both Claude Code and Codex.** sandfit reads both by default. Use `--harness` to pick one.
+
+**My agent has no history in this project yet.** sandfit falls back to all your projects and says so. Or work with your agent for a while and run it again.
+
+## Development
+
+```bash
+npm install
+npm test                 # unit, CLI, property and accuracy tests (130+)
+npm run test:coverage    # the same, with coverage (about 95% of lines)
+npm run test:sandbox     # end to end inside a real sandbox (needs bubblewrap + socat on Linux)
+npm run bench            # all benchmarks; rewrites BENCHMARKS.md
+npm run dev -- --all     # run the CLI from source
+```
+
+The demo video is a [HyperFrames](https://github.com/heygen-com/hyperframes) project in [`demo/video`](demo/video). See [demo/README.md](demo/README.md) to change and re-render it.
 
 ## Contributing
 
-The most valuable contribution is **knowledge**: one entry in [`src/extract/knowledge.ts`](src/extract/knowledge.ts) teaches sandfit what a tool needs (hosts, caches, sockets) for everyone. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-Run `npx sandfit` and the "Tools sandfit has no knowledge of" line tells you exactly which entries are missing for your setup.
+The most useful contribution is **knowledge**: one entry in [`src/extract/knowledge.ts`](src/extract/knowledge.ts) teaches sandfit what a tool needs (websites, cache folders) for everyone. Run `npx sandfit` and the line "Tools sandfit has no knowledge of" tells you which entries are missing for your setup. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
