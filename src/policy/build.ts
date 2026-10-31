@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { SSH_GIT_REASON } from "../extract/extract.js";
 import { SECRET_PROJECT_GLOBS, SELF_PROTECT_PATHS } from "../extract/knowledge.js";
 import type { AnalyzedEvent, Harness, Policy } from "../types.js";
 import { domainAllowed } from "../forecast.js";
@@ -135,6 +136,16 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
   const keep = (prefix: string) => (v: string) => (evidence[`${prefix}:${v}`]?.count ?? minCount) >= minCount;
   const hostKeep = (h: string) => (evidence[`net:${h}`]?.count ?? 0) >= minCount;
 
+  // A repo with an SSH remote needs keys for every sync with it, not just the one the history showed:
+  // a history with `git push` over SSH will also `git pull`. Run all three outside the sandbox together.
+  const sshSync = ["git fetch", "git pull", "git push"].find((c) => excluded.get(c) === SSH_GIT_REASON);
+  if (sshSync) {
+    for (const c of ["git fetch", "git pull", "git push"]) {
+      if (excluded.has(c)) continue;
+      excluded.set(c, SSH_GIT_REASON);
+      if (!evidence[`exclude:${c}`]) evidence[`exclude:${c}`] = { count: evidence[`exclude:${sshSync}`]?.count ?? 1, example: `same SSH remote as ${sshSync}` };
+    }
+  }
   // Sockets of excluded programs are not granted: those programs run outside the sandbox.
   const excludedSockets = new Set(excluded.has("docker") ? ["/var/run/docker.sock"] : []);
 

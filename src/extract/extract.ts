@@ -225,7 +225,8 @@ function shellNeeds(
       for (const h of hosts) needs.push({ kind: "net", value: h, reason: `git ${sub}`, via: "shell", inferred: urlHosts.length === 0 });
       // Pushing, or talking to an SSH remote, needs your git credentials (SSH keys, keychain).
       const sshRemote = urlArgs.some((a) => /^[\w.-]+@[\w.-]+:|^ssh:\/\//.test(a)) || (urlArgs.length === 0 && gitUsesSsh(cmd.cwd));
-      if (sub === "push" || sshRemote) needs.push({ kind: "exec", value: `git ${sub}`, reason: "needs your git credentials (SSH keys or keychain), which the sandbox protects", via: "shell" });
+      if (sshRemote) needs.push({ kind: "exec", value: `git ${sub}`, reason: SSH_GIT_REASON, via: "shell" });
+      else if (sub === "push") needs.push({ kind: "exec", value: "git push", reason: "needs your git credentials (keychain or a token), which the sandbox protects", via: "shell" });
       if (sub === "clone" && positional.length >= 2) needs.push({ kind: "write", value: abs(positional[positional.length - 1]!), reason: "git clone", via: "shell" });
     }
     return;
@@ -374,6 +375,9 @@ function gitRootOf(cwd: string): string | undefined {
   }
   return undefined;
 }
+
+/** Why git over SSH runs outside the sandbox. The policy builder keys on this to group fetch, pull and push. */
+export const SSH_GIT_REASON = "talks to an SSH remote, which needs your SSH keys (the sandbox protects ~/.ssh)";
 
 const sshCache = new Map<string, boolean>();
 function gitUsesSsh(cwd: string): boolean {

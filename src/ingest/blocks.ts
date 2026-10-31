@@ -17,7 +17,7 @@ export interface Block {
 }
 
 /** Cheap pre-check so most outputs are skipped without running the patterns. */
-const MARKER = /read-only file system|operation not permitted|EROFS|EPERM|tunnel|EAI_AGAIN|ENOTFOUND|Could not resolve host|Errno 30|Errno 1\]/i;
+const MARKER = /read-only file system|operation not permitted|EROFS|EPERM|tunnel|network-outbound|blocked-by-allowlist|EAI_AGAIN|ENOTFOUND|Could not resolve host|Errno 30|Errno 1\]/i;
 
 const WRITE_PATTERNS: RegExp[] = [
   // coreutils: touch: cannot touch '/p': Read-only file system   mkdir: cannot create directory '/p': ...
@@ -34,6 +34,10 @@ const WRITE_PATTERNS: RegExp[] = [
 ];
 
 const NET_PATTERNS: RegExp[] = [
+  // Claude Code's sandbox (captured on macOS, Claude Code 2.1.309), appended to the command's output:
+  //   <sandbox_violations>
+  //   deny network-outbound example.org:443 (not in this command's allowed_domains — ...)
+  /deny network-outbound \[?([\w.-]+)\]?:\d+/g,
   // git: fatal: unable to access 'https://host/x/': CONNECT tunnel failed, response 403
   /unable to access '[a-z]+:\/\/(?:[^@/']+@)?([^/:']+)[^']*': (?:CONNECT tunnel failed|Could not resolve host)/gi,
   // curl / git without a proxy: Could not resolve host: host

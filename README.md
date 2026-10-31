@@ -176,6 +176,7 @@ sandfit apply -t <target>   # write it (shows the changes, asks first, keeps a b
 sandfit apply --review      # first keep or drop each grant your history needed only once
 sandfit learn               # what a sandbox blocked in past sessions, as suggestions
 sandfit apply --learn       # first add the blocked things you recognise (Enter skips)
+sandfit drift -t <target>   # does your config still cover what your agent does? (exits 1 if not)
 ```
 
 `sandfit diff` lists every grant it would add and summarizes the protection rules (secret and
@@ -236,7 +237,38 @@ None of these is added for you: a blocked attempt can also be an attack (look at
 `sandfit apply --learn` asks about each, and Enter skips. sandfit never suggests secrets, shell
 startup files, the agent's own config or broad folders. It only uses errors that name the host or
 path (for example `Read-only file system` on Linux, `Operation not permitted` on macOS, or a failed
-lookup that names the host), so a blocked `curl` that only says `CONNECT tunnel failed` teaches it nothing.
+lookup that names the host, or Claude Code's own `deny network-outbound host` report). A blocked `curl`
+under plain sandbox-runtime only says `CONNECT tunnel failed`, so that teaches it nothing.
+
+## Get told when your rules fall behind
+
+Your work changes: a new package registry, a new API, a new cache folder. The sandbox config you
+applied last month doesn't know about them, so those commands start getting blocked.
+
+```bash
+npx sandfit drift
+```
+
+It compares your config with what your agent needed recently. Rules that are **missing** are
+things the sandbox will block, and `sandfit apply` adds them. Rules nothing used are only listed,
+and you decide whether to keep them. It exits 1 when something is missing, so it works in CI or a
+script (`--quiet` prints one line).
+
+To hear about it in Claude Code itself, add a SessionStart hook to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup", "hooks": [{ "type": "command", "command": "npx -y sandfit drift --hook", "timeout": 30 }] }
+    ]
+  }
+}
+```
+
+When your config is missing something, the session opens with a one-line warning. It never stops a
+session, and stays quiet in projects that don't use the sandbox. If you applied with `--user`, add
+`--user` to the command too.
 
 ## Known limits
 

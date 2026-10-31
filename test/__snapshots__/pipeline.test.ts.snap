@@ -256,7 +256,7 @@ exports[`policy > builds the expected policy from Claude Code history 1`] = `
     },
     {
       "pattern": "git push *",
-      "reason": "needs your git credentials (SSH keys or keychain), which the sandbox protects",
+      "reason": "needs your git credentials (keychain or a token), which the sandbox protects",
     },
   ],
   "filesystem": {

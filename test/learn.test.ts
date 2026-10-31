@@ -28,8 +28,25 @@ describe("findBlocks: real sandbox error formats", () => {
 
   it("reads macOS Seatbelt's 'Operation not permitted' too", () => {
     expect(findBlocks("touch: /Users/me/x: Operation not permitted")).toEqual([{ kind: "write", value: "/Users/me/x" }]);
+    // Captured from Claude Code's sandbox on macOS:
+    expect(findBlocks("mkdir: /Users/hardik/.cache/sandfit-probe: Operation not permitted")).toEqual([{ kind: "write", value: "/Users/hardik/.cache/sandfit-probe" }]);
+    expect(findBlocks("touch: /Users/hardik/sandfit-write-probe: Operation not permitted\nls: /Users/hardik/sandfit-write-probe: No such file or directory")).toEqual([{ kind: "write", value: "/Users/hardik/sandfit-write-probe" }]);
     expect(findBlocks("PermissionError: [Errno 1] Operation not permitted: '/Users/me/y'")).toEqual([{ kind: "write", value: "/Users/me/y" }]);
     expect(findBlocks("Error: EPERM: operation not permitted, mkdir '/Users/me/z'")).toEqual([{ kind: "write", value: "/Users/me/z" }]);
+  });
+
+  it("reads Claude Code's own sandbox violation report", () => {
+    // Real output of `curl -sI https://example.org` in a Claude Code session on macOS with sandfit's rules applied.
+    const out = [
+      "HTTP/1.1 403 not in this command's allowed_domains ? re-run the command with this host listed if it needs it",
+      "Content-Type: text/plain",
+      "X-Proxy-Error: blocked-by-allowlist",
+      "<sandbox_violations>",
+      "deny network-outbound example.org:443 (not in this command's allowed_domains — re-run the command with this host listed if it needs it)",
+      "</sandbox_violations>",
+    ].join("\n");
+    expect(findBlocks(out)).toEqual([{ kind: "net", value: "example.org" }]);
+    expect(findBlocks("deny network-outbound 127.0.0.1:8080 (x)")).toEqual([]);
   });
 
   it("reads blocked hosts only when the error names them", () => {

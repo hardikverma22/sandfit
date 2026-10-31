@@ -153,3 +153,28 @@ describe("buildPolicy", () => {
     );
   });
 });
+
+describe("git over SSH", () => {
+  // Found on a real Mac: history had `git push` to an SSH remote, so push ran outside the sandbox,
+  // but the first `git fetch` failed because ~/.ssh is protected inside it.
+  const sshRepo = join(home, "code", "sshapp");
+  mkdirSync(join(sshRepo, ".git"), { recursive: true });
+  writeFileSync(join(sshRepo, ".git", "config"), '[remote "origin"]\n\turl = git@github.com:acme/sshapp.git\n');
+  const httpsRepo = join(home, "code", "httpsapp");
+  mkdirSync(join(httpsRepo, ".git"), { recursive: true });
+  writeFileSync(join(httpsRepo, ".git", "config"), '[remote "origin"]\n\turl = https://github.com/acme/httpsapp.git\n');
+  const excludedFor = (cwd: string, commands: string[]) =>
+    buildPolicy(analyze(commands.map((c) => bashEvent(c, cwd)), { home }), { home, projects: [cwd] }).excludedCommands;
+
+  it("runs fetch, pull and push outside the sandbox together when any of them talked to an SSH remote", () => {
+    const ex = excludedFor(sshRepo, ["git push", "git status"]);
+    expect(ex.map((e) => e.pattern)).toEqual(["git fetch *", "git pull *", "git push *"]);
+    expect(ex.every((e) => e.reason.includes("SSH"))).toBe(true);
+  });
+
+  it("leaves HTTPS remotes alone: fetch works inside the sandbox there", () => {
+    const ex = excludedFor(httpsRepo, ["git push", "git fetch"]);
+    expect(ex.map((e) => e.pattern)).toEqual(["git push *"]);
+    expect(ex[0]!.reason).toContain("keychain or a token");
+  });
+});

@@ -287,6 +287,60 @@ describe("diff and review", () => {
   });
 });
 
+describe("drift", () => {
+  const settings = () => join(project, ".claude", "settings.json");
+  const clean = () => rmSync(join(project, ".claude"), { recursive: true, force: true });
+
+  it("says when the sandbox is not set up, and the hook stays quiet about it", () => {
+    clean();
+    const r = sandfit(["drift"]);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("no config here yet");
+    expect(sandfit(["drift", "--quiet"]).out).toContain("no sandbox config at");
+    const hook = sandfit(["drift", "--hook"]);
+    expect(hook).toMatchObject({ code: 0, out: "" });
+  });
+
+  it("is in step right after apply", () => {
+    clean();
+    expect(sandfit(["apply", "-y"]).code).toBe(0);
+    const r = sandfit(["drift"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("in step");
+    expect(sandfit(["drift", "--quiet"]).out).toBe("");
+    expect(sandfit(["drift", "--hook"]).out).toBe("");
+  });
+
+  it("flags what recent history needs that the config lacks, and lists what went unused", () => {
+    clean();
+    expect(sandfit(["apply", "-y"]).code).toBe(0);
+    const s = JSON.parse(readFileSync(settings(), "utf8"));
+    s.sandbox.network.allowedDomains = ["old.example.com"];
+    writeFileSync(settings(), JSON.stringify(s));
+    const r = sandfit(["drift"]);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("+ registry.npmjs.org");
+    expect(r.out).toContain("· old.example.com");
+    const j = JSON.parse(sandfit(["drift", "--json"]).out);
+    expect(j.missing).toContainEqual({ path: "sandbox.network.allowedDomains", kind: "add", value: "registry.npmjs.org" });
+    expect(j.unused).toEqual([{ path: "sandbox.network.allowedDomains", kind: "add", value: "old.example.com" }]);
+    expect(j.protections).toEqual([]);
+    const hook = sandfit(["drift", "--hook"]);
+    expect(hook.code).toBe(0);
+    expect(JSON.parse(hook.out).systemMessage).toMatch(/missing \d+ hosts? your agent used in the last 30 days/);
+    clean();
+  });
+
+  it("the hook never fails a session, even when it cannot read a config", () => {
+    clean();
+    mkdirSync(join(project, ".claude"), { recursive: true });
+    writeFileSync(settings(), "{ not json");
+    expect(sandfit(["drift", "--hook"])).toMatchObject({ code: 0, out: "" });
+    expect(sandfit(["drift"]).code).not.toBe(0);
+    clean();
+  });
+});
+
 describe("learn", () => {
   let learnProject: string;
   beforeAll(() => {

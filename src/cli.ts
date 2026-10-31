@@ -9,6 +9,7 @@ import { parse as tomlParse, stringify as tomlStringify } from "smol-toml";
 import { mergeSettings, toClaudeSettings } from "./emit/claude.js";
 import { toCodexToml, toNonoProfile, toOpenShellPolicy, toPolicyYaml, toSrtSettings } from "./emit/others.js";
 import { diffConfig, unusedEntries } from "./diff.js";
+import { computeDrift, driftLine, renderDrift } from "./drift.js";
 import { forecast, modelFromPolicy } from "./forecast.js";
 import { plural, renderBlockers, renderChanges, renderDiff, renderExplain, renderLearn, renderSummary } from "./report.js";
 import { addToPolicy, learnSuggestions } from "./learn.js";
@@ -313,6 +314,39 @@ targetOptions(common(program.command("diff").description("show what apply would 
       return;
     }
     console.log(renderDiff(plan.file, existsSync(plan.file), changes, unused, !!o.full));
+  });
+
+targetOptions(common(program.command("drift").description("check that your sandbox config still covers what your agent does (exits 1 if it does not)")))
+  .option("--json", "print machine-readable results")
+  .option("-q, --quiet", "print one line, and only when something is missing")
+  .option("--hook", "print a Claude Code hook message when something is missing; always exits 0 (for a SessionStart hook)")
+  .action(async (o) => {
+    const target = o.target as Target;
+    try {
+      const r = await run({ ...runOpts(o, scopeFor(target)), holdout: 0 });
+      if (o.hook || o.quiet) {
+        // A hook must never get in the way: nothing to check means nothing to say.
+        if (r.withPolicy.shellCalls === 0 || (target === "claude" && !o.user && r.projects.length !== 1)) return;
+      } else if (!checkApplicable(target, r, o)) return;
+      const plan = planFor(target, r.policy, r.projects, o);
+      const drift = computeDrift(plan, existsSync(plan.file));
+      const days = o.days > 0 ? o.days : undefined;
+      if (o.hook) {
+        // A project that never set the sandbox up is not drift: stay quiet there.
+        const line = drift.exists ? driftLine(drift, days, target, !!o.user) : "";
+        if (line) console.log(JSON.stringify({ systemMessage: line }));
+        return;
+      }
+      if (o.json) console.log(JSON.stringify(drift, null, 2));
+      else if (o.quiet) {
+        const line = driftLine(drift, days, target, !!o.user);
+        if (line) console.log(line);
+      } else console.log(renderDrift(drift, days, target, !!o.user));
+      if (!drift.exists || drift.missing.length) process.exitCode = 1;
+    } catch (e) {
+      if (o.hook) return;
+      throw e;
+    }
   });
 
 targetOptions(common(program.command("apply").description("write the policy into your sandbox's config (shows the changes, asks first, keeps a backup)")))
