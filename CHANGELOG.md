@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-10-31)
 
 ### Added
 - `sandfit diff`: what `apply` would change in your sandbox config, entry by entry, without writing
