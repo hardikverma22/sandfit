@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="96" height="96" alt="sandfit logo"></p>
+
 <h1 align="center">sandfit</h1>
 
 <p align="center">
