@@ -65,9 +65,9 @@ Node v22.23.4 · Intel(R) Xeon(R) Processor @ 2.10GHz · 4 cores
 
 | Tool calls | Transcript size | Read files | Work out needs | Build policy | Forecast (×2) | Total | Tool calls/s | Peak memory |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1,000 | 13 MB in 5 files | 68 ms | 28 ms | 30 ms | 14 ms | **140 ms** | 7,155 | 152 MB |
-| 10,000 | 127 MB in 50 files | 383 ms | 110 ms | 80 ms | 85 ms | **658 ms** | 15,196 | 192 MB |
-| 100,000 | 1270 MB in 500 files | 3.05 s | 629 ms | 591 ms | 550 ms | **4.82 s** | 20,733 | 350 MB |
+| 1,000 | 13 MB in 5 files | 50 ms | 15 ms | 17 ms | 8 ms | **90 ms** | 11,145 | 123 MB |
+| 10,000 | 127 MB in 50 files | 383 ms | 78 ms | 54 ms | 61 ms | **576 ms** | 17,356 | 201 MB |
+| 100,000 | 1270 MB in 500 files | 2.86 s | 593 ms | 559 ms | 509 ms | **4.52 s** | 22,115 | 385 MB |
 
 ## 3. Does the forecast match a real sandbox?
 
@@ -88,7 +88,7 @@ Real sandbox: Anthropic sandbox-runtime on linux
 | `touch ~/src/tools/NEW` (a repository the history cloned) | allowed | allowed | allowed | ✓ | ✓ |
 | `touch /tmp/sandfit-probe` (temp) | allowed | allowed | allowed | ✓ | ✓ |
 | `cat README.md` (reading the project) | allowed | allowed | allowed | ✓ | ✓ |
-| `timeout 2 python3 -m http.server 0 --bind 127.0.0.1` (a local dev server (npm run dev in history)) | allowed | allowed | allowed | ✓ | ✓ |
+| `python3 -m http.server 0 --bind 127.0.0.1 & sleep 2; kill $!` (a local dev server (npm run dev in history)) | allowed | allowed | allowed | ✓ | ✓ |
 | `curl -sS -m 20 -o /dev/null https://registry.npmjs.org/left-pad` (npm registry (npm install in history)) | allowed | allowed | allowed | ✓ | ✓ |
 | `curl -sS -m 20 -o /dev/null https://api.github.com/zen` (a host the history reached) | allowed | allowed | allowed | ✓ | ✓ |
 | `curl -sS -m 20 -o /dev/null https://github.com` (git clone in history) | allowed | allowed | allowed | ✓ | ✓ |

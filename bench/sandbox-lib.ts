@@ -47,7 +47,7 @@ export const PROBES: Probe[] = [
   { cmd: "touch ~/src/tools/NEW", should: "allow", why: "a repository the history cloned" },
   { cmd: "touch /tmp/sandfit-probe", should: "allow", why: "temp" },
   { cmd: "cat README.md", should: "allow", why: "reading the project" },
-  { cmd: "timeout 2 python3 -m http.server 0 --bind 127.0.0.1", should: "allow", why: "a local dev server (npm run dev in history)" },
+  { cmd: "python3 -m http.server 0 --bind 127.0.0.1 & sleep 2; kill $!", should: "allow", why: "a local dev server (npm run dev in history)" },
   { cmd: "curl -sS -m 20 -o /dev/null https://registry.npmjs.org/left-pad", should: "allow", why: "npm registry (npm install in history)", net: true },
   { cmd: "curl -sS -m 20 -o /dev/null https://api.github.com/zen", should: "allow", why: "a host the history reached", net: true },
   { cmd: "curl -sS -m 20 -o /dev/null https://github.com", should: "allow", why: "git clone in history", net: true },
@@ -143,8 +143,8 @@ export function runProbes(env: Env, settingsFile: string, model: SandboxModel, p
     if (probe.net && !env.online) continue;
     const predictedBlocked = forecast(analyze([ev(probe.cmd, i, env.project)], { home: env.home }), model, env.home).blockedCalls > 0;
     const r = srt(env, probe.cmd, settingsFile);
-    // `timeout` exits 124 when the server was still running: it started fine.
-    const failed = r.code !== 0 && r.code !== 124;
+    // The server probe ends with `kill $!`, which fails if the server already died (could not bind).
+    const failed = r.code !== 0;
     const actuallyBlocked = failed || (!!probe.canary && !r.out.includes(CANARY));
     results.push({ probe, predictedBlocked, actuallyBlocked, out: r.out.slice(0, 300) });
   }
