@@ -10,6 +10,14 @@ import { ingest } from "../src/ingest/index.js";
 import { buildPolicy, redact } from "../src/policy/build.js";
 import { generalizeHosts, isSecret, tempRoots } from "../src/policy/paths.js";
 import type { AgentEvent } from "../src/types.js";
+import { VERSION } from "../src/version.js";
+
+// Snapshots shouldn't change on every release.
+expect.addSnapshotSerializer({
+  test: (v) => typeof v === "string" && v.includes(`sandfit ${VERSION}`),
+  serialize: (v, config, indent, depth, refs, printer) =>
+    printer((v as string).replaceAll(`sandfit ${VERSION}`, "sandfit <VERSION>"), config, indent, depth, refs),
+});
 
 const HOME = "/home/test";
 const FIX = fileURLToPath(new URL("./fixtures/", import.meta.url));

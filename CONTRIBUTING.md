@@ -57,3 +57,10 @@ On Linux, the real-sandbox tests need `bubblewrap`, `socat` and `ripgrep` (sandb
 - **Every grant is explainable.** If you add a new kind of grant, record evidence for it.
 - **The forecast must match a real sandbox.** If you change emitters or the forecast model, add probes to `bench/sandbox-lib.ts` (they run in `npm run test:sandbox` and in CI).
 - **Publish only measured numbers.** README and BENCHMARKS.md numbers come from `npm run bench`.
+
+## Releasing (maintainers)
+
+Put release notes under `## Unreleased` in CHANGELOG.md as changes land. To release, open
+**Actions → release → Run workflow** on GitHub and pick patch, minor or major. The workflow tests,
+bumps `package.json` (the only place the version lives), dates the changelog, tags, publishes to
+npm with provenance and creates the GitHub release.

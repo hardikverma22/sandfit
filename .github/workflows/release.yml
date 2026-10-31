@@ -1,0 +1,69 @@
+name: release
+# One click in GitHub (Actions → release → Run workflow): bump the version, date the changelog,
+# tag, push, publish to npm and create the GitHub release.
+# npm auth is trusted publishing (OIDC): no token is stored here. The package must list this
+# repo and workflow file as its trusted publisher on npmjs.com.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "patch (fixes), minor (new features) or major (breaking changes)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write # push the release commit and tag, create the release
+  id-token: write # npm trusted publishing and provenance
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Bump version and date the changelog
+        id: bump
+        run: |
+          npm version "${{ inputs.bump }}" --no-git-tag-version
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if ! grep -q '^## Unreleased$' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## Unreleased' section. Add release notes there first."
+            exit 1
+          fi
+          sed -i "s/^## Unreleased$/## $version ($(date -u +%F))/" CHANGELOG.md
+          # Keep the sample output in the README and demo on the current version.
+          sed -i -E "s/^sandfit [0-9]+\.[0-9]+\.[0-9]+  ·/sandfit $version  ·/" README.md demo/output/summary.txt
+          # Release notes: the changelog section for this version.
+          awk -v v="## $version " 'index($0, v) == 1 {f=1; next} /^## /{f=0} f' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+
+      - name: Commit, tag and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release ${{ steps.bump.outputs.version }}"
+          git tag "v${{ steps.bump.outputs.version }}"
+          # Fails if main moved during the run, before anything is published.
+          git push origin main "v${{ steps.bump.outputs.version }}"
+
+      - run: npm publish --access public --provenance
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v${{ steps.bump.outputs.version }}" --title "sandfit ${{ steps.bump.outputs.version }}" --notes-file "$RUNNER_TEMP/notes.md" --latest
