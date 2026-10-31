@@ -1,4 +1,5 @@
 .hyperframes/
+.media/
 node_modules/
 assets/bgm/
 assets/sfx/

@@ -1,6 +1,6 @@
 # The demo video
 
-`sandfit-demo.mp4` (shown in the main README, with sound; `sandfit-demo.gif` is a silent cut for places that cannot play video) is a
+`sandfit-demo.mp4` (with sound) and `sandfit-demo.gif` (the silent preview at the top of the main README, which links to the MP4) are a
 [HyperFrames](https://github.com/heygen-com/hyperframes) project: HTML and GSAP animations
 rendered to video, frame by frame, so every render is identical.
 
@@ -28,7 +28,8 @@ npx hyperframes preview                            # live preview in the browser
 npx hyperframes render --quality looks --output ../sandfit-demo.mp4
 ```
 
-Then the GIF for the README:
+Then the GIF preview for the README (GitHub does not play `<video>` tags that point at repository
+files; only videos uploaded through its web editor play inline):
 
 ```bash
 ffmpeg -y -i demo/sandfit-demo.mp4 -vf "fps=15,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" demo/sandfit-demo.gif
