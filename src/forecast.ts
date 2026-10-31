@@ -57,7 +57,7 @@ export function domainAllowed(host: string, patterns: string[]): boolean {
 
 export interface Blocker {
   key: string;
-  kind: "write" | "net" | "bind" | "socket" | "secret";
+  kind: "write" | "net" | "bind" | "socket" | "secret" | "exec";
   fix: string;
   count: number;
   examples: string[];
@@ -147,6 +147,10 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
           blocked = true;
           hit("bind:localhost", "bind", "allowLocalBinding: true", example);
         }
+      } else if (n.kind === "exec") {
+        // Not excluded (we returned above if it was), so it runs inside and fails.
+        blocked = true;
+        hit(`exec:${n.value}`, "exec", `excludedCommands: ${n.value} * (${n.reason})`, example);
       } else if (n.kind === "socket") {
         if (!model.sockets.includes(n.value)) {
           blocked = true;
