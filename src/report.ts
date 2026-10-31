@@ -1,6 +1,7 @@
 import pc from "picocolors";
 import type { ForecastResult } from "./forecast.js";
 import type { ConfigChange } from "./diff.js";
+import type { Suggestion } from "./learn.js";
 import type { Policy } from "./types.js";
 
 export function pct(n: number, d: number): string {
@@ -228,6 +229,28 @@ export function renderDiff(file: string, exists: boolean, changes: ConfigChange[
     out.push(`  ${pc.dim(`Already in your settings but not needed by this history (apply keeps ${unused.length === 1 ? "it" : "them"}; remove by hand if unwanted):`)}`);
     out.push(renderChanges(unused, { marker: pc.dim("·") }));
   }
+  out.push("");
+  return out.join("\n");
+}
+
+export function renderLearn(suggestions: Suggestion[]): string {
+  const out: string[] = [""];
+  if (suggestions.length === 0) {
+    out.push("  No sandbox blocks found in this history that the policy does not already allow.");
+    out.push(pc.dim("  Learn mode reads errors from sessions where the sandbox was on. Run your agent with the sandbox on for a while, then try again."));
+    out.push("");
+    return out.join("\n");
+  }
+  out.push(pc.bold("  Blocked in past sessions, and not in the policy"));
+  out.push(pc.dim("  These come from sandbox errors in your history: things scripts and tools tried to reach that the commands themselves don't show."));
+  out.push(pc.dim("  A blocked attempt can also be an attack, so none is added automatically."));
+  out.push("");
+  for (const s of suggestions) {
+    out.push(`  ${pc.yellow("?")} ${s.kind === "domain" ? "network" : "write  "}  ${pc.bold(s.value)}  ${pc.dim(`blocked ${plural(s.count, "time")}`)}`);
+    for (const e of s.examples.slice(0, 2)) out.push(`      ${pc.dim("e.g.")} ${e.length > 100 ? e.slice(0, 99) + "…" : e}`);
+  }
+  out.push("");
+  out.push(`  ${pc.green("sandfit apply --learn")}   add the ones you recognise ${pc.dim("(asks about each; Enter skips)")}`);
   out.push("");
   return out.join("\n");
 }

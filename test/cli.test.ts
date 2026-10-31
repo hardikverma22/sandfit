@@ -283,3 +283,42 @@ describe("diff and review", () => {
     clean();
   });
 });
+
+describe("learn", () => {
+  let learnProject: string;
+  beforeAll(() => {
+    learnProject = join(home, "learnapp");
+    mkdirSync(join(learnProject, ".git"), { recursive: true });
+    writeClaudeTranscript(
+      join(home, ".claude", "projects", "-learnapp", "l.jsonl"),
+      learnProject,
+      [
+        { command: "npm install" },
+        { command: "python scripts/sync.py", output: "HTTPSConnectionPool(host='api.acme.dev', port=443): Max retries exceeded (Caused by ProxyError('x', OSError('Tunnel connection failed: 403 Forbidden')))" },
+        { command: "./deploy.sh", output: `touch: cannot touch '${home}/.zshrc': Read-only file system\nError: getaddrinfo EAI_AGAIN exfil.evil.example` },
+      ],
+      "learn",
+    );
+  });
+
+  it("lists what was blocked, but never protected files", () => {
+    const r = sandfit(["learn"], { cwd: learnProject });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("api.acme.dev");
+    expect(r.out).toContain("exfil.evil.example");
+    expect(r.out).not.toContain(".zshrc");
+    expect(JSON.parse(sandfit(["learn", "--json"], { cwd: learnProject }).out).suggestions).toHaveLength(2);
+  });
+
+  it("apply --learn adds only what you accept; Enter skips", () => {
+    const r = sandfit(["apply", "--learn", "-y"], { cwd: learnProject, input: "a\n\n" });
+    expect(r.code).toBe(0);
+    const s = JSON.parse(readFileSync(join(learnProject, ".claude", "settings.json"), "utf8"));
+    expect(s.sandbox.network.allowedDomains).toContain("api.acme.dev");
+    expect(s.sandbox.network.allowedDomains).not.toContain("exfil.evil.example");
+  });
+
+  it("says when there is nothing to learn", () => {
+    expect(sandfit(["learn"]).out).toContain("No sandbox blocks found");
+  });
+});

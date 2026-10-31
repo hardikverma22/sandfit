@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
+import { findBlocks } from "./blocks.js";
 import { readLines } from "./lines.js";
 import type { AgentEvent } from "../types.js";
 
@@ -125,6 +126,10 @@ export async function parseCodexTranscript(file: string): Promise<AgentEvent[]> 
       const exit = /"exit_code"\s*:\s*(\d+)/.exec(out);
       if (exit && exit[1] !== "0") ev.failed = true;
       if (/sandbox denied|Operation not permitted|EPERM/i.test(out)) ev.failed = true;
+      if (ev.tool === "bash") {
+        const blocked = findBlocks(out.replace(/\\n/g, "\n").replace(/\\'/g, "'"), ev.cwd || "/");
+        if (blocked.length) ev.blocked = blocked;
+      }
     } else if (entry?.type === "event_msg" && payload?.type === "exec_approval_request") {
       const ev = byCallId.get(String(payload.call_id));
       if (ev) ev.decision = "prompted";

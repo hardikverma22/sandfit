@@ -28,6 +28,8 @@ export interface ToolCall {
   /** "user_temporary" = a person approved it; "config" = allowed by a rule; "reject" = refused. */
   decision?: "user_temporary" | "config" | "reject";
   error?: boolean;
+  /** The tool result text (default "ok"). */
+  output?: string;
   timestamp?: string;
 }
 
@@ -41,7 +43,7 @@ export function writeClaudeTranscript(file: string, cwd: string, calls: ToolCall
     const input = c.input ?? { command: c.command };
     lines.push(JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id, name: c.name ?? "Bash", input }] }, ...base }));
     const pd = c.decision === "reject" ? { decision: "reject", source: "user_temporary" } : { decision: "accept", source: c.decision ?? "config" };
-    lines.push(JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: id, content: "ok", ...(c.error ? { is_error: true } : {}) }] }, permissionDecision: pd, ...base }));
+    lines.push(JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: id, content: c.output ?? "ok", ...(c.error ? { is_error: true } : {}) }] }, permissionDecision: pd, ...base }));
   });
   mkdirSync(join(file, ".."), { recursive: true });
   writeFileSync(file, lines.join("\n") + "\n");

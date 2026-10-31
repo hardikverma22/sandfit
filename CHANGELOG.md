@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- `sandfit learn`: lists what a sandbox actually blocked in past sessions (hosts and paths named
+  in the errors of sandboxed commands: a script refused an API, a tool that couldn't write its
+  cache). These are the needs a command's text doesn't show.
+- `sandfit apply --learn`: asks about each blocked host or path, and adds only what you accept.
+  Enter skips, because a blocked attempt can be an attack. Secrets, shell startup files, the agent's
+  own config and broad folders are never suggested.
+
+## Unreleased
+
+### Added
 - `--strict-network` (Claude Code, with `--user`): writes `sandbox.network.strictAllowlist`, so hosts
   outside the allowlist are refused instead of prompting. Needs Claude Code v2.1.219 or later. Claude
   Code only honours it in user or managed settings, so sandfit refuses it for project settings
