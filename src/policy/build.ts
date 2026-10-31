@@ -1,6 +1,9 @@
+import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { SECRET_PROJECT_GLOBS, SELF_PROTECT_PATHS } from "../extract/knowledge.js";
 import type { AnalyzedEvent, Harness, Policy } from "../types.js";
+import { redact } from "../redact.js";
 import { VERSION } from "../version.js";
 import { dropSubsumed, generalizeHosts, generalizeWrite, gitRoot, isSecret, isSelfProtected, secretPaths, tildify, tooBroad } from "./paths.js";
 
@@ -32,13 +35,29 @@ export function projectRootsOf(analyzed: AnalyzedEvent[], home = homedir()): str
     .sort();
 }
 
-/** Redact things that look like credentials before they land in a policy file. */
-export function redact(s: string): string {
-  return s
-    .replace(/(authorization:\s*(bearer|basic)\s+)\S+/gi, "$1***")
-    .replace(/((?:api[_-]?key|token|secret|password|passwd|pwd)["']?\s*[=:]\s*["']?)[^\s"'&]+/gi, "$1***")
-    .replace(/\b(sk|pk|rk|ghp|gho|ghs|xox[abp]|AKIA)[-_A-Za-z0-9]{12,}\b/g, "***")
-    .replace(/\b[A-Za-z0-9+/_-]{40,}\b/g, "***");
+export { redact } from "../redact.js";
+
+const SECRET_FILE = /^(\.env(\.(?!example$|sample$|template$|dist$)[\w.-]+)?|\.envrc|.*\.(pem|key))$/;
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".next", ".venv", "venv", "target", "vendor", "__pycache__"]);
+
+/** Secret files that exist in a project (two levels deep), relative to its root. */
+export function findProjectSecrets(root: string, depth = 2): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, rel: string, d: number) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        if (d < depth && !SKIP_DIRS.has(e.name)) walk(join(dir, e.name), rel ? `${rel}/${e.name}` : e.name, d + 1);
+      } else if (SECRET_FILE.test(e.name)) out.push(rel ? `${rel}/${e.name}` : e.name);
+    }
+  };
+  walk(root, "", 0);
+  return out.sort();
 }
 
 export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}): Policy {
@@ -127,7 +146,11 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
     projects: projects.map((p) => tildify(p, home)),
     filesystem: {
       allowWrite: dropSubsumed([...shellWrites].filter(keep("write"))),
-      denyRead: [...secretPaths(home).map((p) => tildify(p, home)).filter((p) => !neededSecrets.has(p)), ...SECRET_PROJECT_GLOBS.map((g) => `./${g}`)],
+      denyRead: [
+        ...secretPaths(home).map((p) => tildify(p, home)).filter((p) => !neededSecrets.has(p)),
+        ...[...new Set(projects.flatMap((p) => findProjectSecrets(p)))].map((rel) => `./${rel}`),
+        ...SECRET_PROJECT_GLOBS.map((g) => `./${g}`),
+      ],
       denyWrite: SELF_PROTECT_PATHS.map((p) => (p.startsWith("~") ? p : `./${p}`)),
     },
     network: {

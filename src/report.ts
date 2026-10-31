@@ -54,10 +54,14 @@ export function renderSummary(s: SummaryInput): string {
   out.push("");
   out.push(pc.bold("  With the sandfit policy"));
   const broken = w.blockedCalls - w.secretCalls;
-  out.push(`  ${bar(broken, w.shellCalls)}  ${pc.bold(pc.green(pct(broken, w.shellCalls)))} would break  ${pc.dim(`(${fmt(broken)} of ${fmt(w.shellCalls)})`)}`);
   if (s.holdout && s.holdout.result.shellCalls > 0) {
+    // Lead with the honest number: a policy tested on history it was not built from.
     const h = s.holdout.result;
-    out.push(`  ${pc.dim("Tested on your newest")} ${Math.round(s.holdout.fraction * 100)}% ${pc.dim("of history, which the policy never saw:")} ${pc.bold(pct(h.blockedCalls - h.secretCalls, h.shellCalls))} ${pc.dim("would break")}`);
+    const hb = h.blockedCalls - h.secretCalls;
+    out.push(`  ${bar(hb, h.shellCalls)}  ${pc.bold(pc.green(pct(hb, h.shellCalls)))} would break  ${pc.dim(`(${fmt(hb)} of ${fmt(h.shellCalls)} commands from your newest ${Math.round(s.holdout.fraction * 100)}% of history, which the policy never saw)`)}`);
+    out.push(`  ${pc.dim(`On the history it was built from: ${pct(broken, w.shellCalls)}`)}`);
+  } else {
+    out.push(`  ${bar(broken, w.shellCalls)}  ${pc.bold(pc.green(pct(broken, w.shellCalls)))} would break  ${pc.dim(`(${fmt(broken)} of ${fmt(w.shellCalls)})`)}`);
   }
   if (w.secretCalls > 0) out.push(`  ${pc.yellow(fmt(w.secretCalls))} commands that read secrets are blocked ${pc.dim("on purpose")}`);
   if (w.promptedBefore > 0) out.push(`  Manual approvals you would no longer need: ${pc.bold(fmt(w.promptsAvoided))} of ${fmt(w.promptedBefore)}`);

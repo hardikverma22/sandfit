@@ -17,7 +17,7 @@ export interface ClaudeEmitOptions {
 }
 
 export function toClaudeSettings(policy: Policy, opts: ClaudeEmitOptions = {}): Record<string, unknown> {
-  const projectSecretsPlain = policy.filesystem.denyRead.filter((p) => p.startsWith("./") && !p.includes("*"));
+  const projectSecretsPlain = [...new Set(policy.filesystem.denyRead.filter((p) => p.startsWith("./") && !p.includes("*")))];
   const secretsAbs = policy.filesystem.denyRead.filter((p) => !p.startsWith("./"));
   const globs = policy.filesystem.denyRead.filter((p) => p.startsWith("./") && p.includes("*"));
 

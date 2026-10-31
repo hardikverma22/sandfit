@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { expandHome } from "./extract/extract.js";
 import { generalizeWrite, isInside, tempRoots, tildify } from "./policy/paths.js";
+import { redact } from "./redact.js";
 import type { AnalyzedEvent, Policy } from "./types.js";
 
 /**
@@ -90,7 +91,12 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
   const hit = (key: string, kind: Blocker["kind"], fix: string, example: string) => {
     const b = blockers.get(key) ?? { key, kind, fix, count: 0, examples: [] };
     b.count++;
-    if (b.examples.length < 3 && !b.examples.includes(example)) b.examples.push(example.slice(0, 140));
+    const clean = redact(example.replace(/\s+/g, " ").trim()).slice(0, 160);
+    if (!b.examples.includes(clean)) {
+      b.examples.push(clean);
+      b.examples.sort((x, y) => x.length - y.length);
+      b.examples.length = Math.min(b.examples.length, 3);
+    }
     blockers.set(key, b);
   };
 
@@ -115,12 +121,9 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
       if (n.kind === "write") {
         const denied = model.denyWrite.some((d) => isInside(n.value, d));
         const allowed = model.writeRoots.some((r) => isInside(n.value, r));
-        const touchesSecret = isDeniedSecret(n.value, model);
-        if (touchesSecret) {
-          blocked = true;
-          secret = true;
-          hit(`secret:${tildify(n.value, home)}`, "secret", "blocked on purpose (secret)", example);
-        } else if (denied || !allowed) {
+        // Writing a secrets file (e.g. creating .env.local from .env.example) is fine;
+        // the sandbox protects secrets from being read, not from being created.
+        if (denied || !allowed) {
           blocked = true;
           if (denied) hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (agent config or shell startup file)", example);
           else {
@@ -172,12 +175,9 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
   };
 }
 
-const PROJECT_SECRET = /^(\.env(\.(?!example$|sample$|template$)[\w.-]+)?|\.envrc|.*\.(pem|key))$/;
-
-/** A path the model protects as a secret: listed in denyRead, or a project secret file. */
+/** A path the model protects from reading: inside an explicit denyRead entry. */
 function isDeniedSecret(p: string, model: SandboxModel): boolean {
-  if (model.denyRead.some((d) => isInside(p, d))) return true;
-  return model.denyRead.length > 0 && PROJECT_SECRET.test(p.split("/").pop() ?? "");
+  return model.denyRead.some((d) => isInside(p, d));
 }
 
 /** Split events by time: the first part trains a policy, the rest tests it. */
