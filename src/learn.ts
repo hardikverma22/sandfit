@@ -10,7 +10,7 @@
  * folders are never suggested.
  */
 import { domainAllowed } from "./forecast.js";
-import { generalizeWrite, isInside, isSecret, isSelfProtected, tildify, tooBroad } from "./policy/paths.js";
+import { generalizeWrite, isAgentState, isInside, isSecret, isSelfProtected, tildify, tooBroad } from "./policy/paths.js";
 import { redact } from "./redact.js";
 import type { AnalyzedEvent, Policy } from "./types.js";
 import { expandHome } from "./extract/extract.js";
@@ -28,11 +28,11 @@ export function learnSuggestions(analyzed: AnalyzedEvent[], policy: Policy, home
   const abs = (p: string) => expandHome(p, home);
   const writeRoots = [...projects, ...policy.filesystem.allowWrite.map(abs)];
   const found = new Map<string, Suggestion>();
-  const add = (kind: Suggestion["kind"], value: string, command: string) => {
+  const add = (kind: Suggestion["kind"], value: string, command: string, needles: string[]) => {
     const key = `${kind}:${value}`;
     const s = found.get(key) ?? { kind, value, count: 0, examples: [] };
     s.count++;
-    const ex = redact(command.replace(/\s+/g, " ").trim()).slice(0, 160);
+    const ex = redact(lineMentioning(command, needles).replace(/\s+/g, " ").trim()).slice(0, 160);
     if (!s.examples.includes(ex)) s.examples = [...s.examples, ex].sort((a, b) => a.length - b.length).slice(0, 3);
     found.set(key, s);
   };
@@ -41,18 +41,30 @@ export function learnSuggestions(analyzed: AnalyzedEvent[], policy: Policy, home
       const command = a.event.command ?? a.event.toolName;
       if (b.kind === "net") {
         if (domainAllowed(b.value, policy.network.allowDomains)) continue;
-        add("domain", b.value, command);
+        add("domain", b.value, command, [b.value]);
       } else {
         const p = b.value;
-        if (isSecret(p, home) || isSelfProtected(p, home, projects) || tooBroad(p, home)) continue;
+        if (isSecret(p, home) || isSelfProtected(p, home, projects) || isAgentState(p, home) || tooBroad(p, home)) continue;
         if (writeRoots.some((r) => isInside(p, r))) continue;
         const g = generalizeWrite(p, home, projects);
         if (!g || tooBroad(g, home)) continue;
-        add("write", tildify(g, home), command);
+        add("write", tildify(g, home), command, [p, tildify(p, home), p.split("/").pop() ?? p]);
       }
     }
   }
   return [...found.values()].sort((x, y) => y.count - x.count || x.value.localeCompare(y.value));
+}
+
+/** For a multi-line call, the line that mentions what was blocked: the command that hit it. */
+export function lineMentioning(command: string, needles: string[]): string {
+  const lines = command.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+  if (lines.length <= 1) return command;
+  // Most specific needle first: a full path beats a bare file name that an echo might also mention.
+  for (const n of needles) {
+    const line = n && lines.find((l) => l.includes(n));
+    if (line) return line;
+  }
+  return command;
 }
 
 /** A copy of the policy with the accepted suggestions granted, and evidence recorded for them. */

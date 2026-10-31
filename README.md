@@ -273,6 +273,7 @@ session, and stays quiet in projects that don't use the sandbox. If you applied 
 ## Known limits
 
 - sandfit sees **commands**, not everything a command does inside. If a script calls an API sandfit has never heard of, that website is not in the rules until you run it once with the sandbox on; then `sandfit learn` picks it up from the error. sandfit lists such tools under "Tools sandfit has no knowledge of".
+- Commands that run **outside** the sandbox (like `git push` or `docker`) only do so when Claude runs them on their own. Claude Code keeps `cd repo && git push`, `git push | tail -1` or anything with `$(...)` inside the sandbox, where they fail. The forecast lists these with the reason. If you see them often, tell your agent (for example in `CLAUDE.md`) to run git and docker commands by themselves.
 - On **Linux**, every sandboxed command gets its own network, so a dev server started by one command cannot be reached by the next. That is how the sandbox works there, not something sandfit can change.
 - The Codex, nono and OpenShell configs are checked against those tools' published schemas, but only sandbox-runtime (which Claude Code's sandbox is built on) is tested by actually running commands.
 

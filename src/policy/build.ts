@@ -7,7 +7,7 @@ import type { AnalyzedEvent, Harness, Policy } from "../types.js";
 import { domainAllowed } from "../forecast.js";
 import { redact } from "../redact.js";
 import { VERSION } from "../version.js";
-import { dropSubsumed, generalizeHosts, generalizeWrite, gitRoot, isSecret, isSelfProtected, secretPaths, tildify, tooBroad } from "./paths.js";
+import { dropSubsumed, generalizeHosts, generalizeWrite, gitRoot, isAgentState, isSecret, isSelfProtected, secretPaths, tildify, tooBroad } from "./paths.js";
 
 export interface BuildOptions {
   home?: string;
@@ -91,6 +91,7 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
       switch (n.kind) {
         case "write": {
           if (isSecret(n.value, home) || isSelfProtected(n.value, home, projects)) continue;
+          if (n.via === "shell" && isAgentState(n.value, home)) continue;
           const g = generalizeWrite(n.value, home, projects);
           if (!g) continue;
           const key = tildify(g, home);

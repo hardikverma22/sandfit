@@ -178,3 +178,12 @@ describe("git over SSH", () => {
     expect(ex[0]!.reason).toContain("keychain or a token");
   });
 });
+
+describe("the agent's own state", () => {
+  // Seen on a real Mac: a write to ~/.claude/projects/<p>/memory was granted to sandboxed commands.
+  it("is never granted to commands: they could change what the agent reads or does next", () => {
+    const writes = ["~/.claude/projects/x/memory/notes.md", "~/.claude/commands/deploy.md", "~/.codex/prompts/x.md", "~/.claude.json"].map((p) => p.replace("~", home));
+    const policy = buildPolicy(analyze(writes.map((w, i) => bashEvent(`echo hi > ${w}`, project, { id: String(i) })), { home }), { home, projects: [project] });
+    expect(policy.filesystem.allowWrite.filter((w) => w.includes(".claude") || w.includes(".codex"))).toEqual([]);
+  });
+});

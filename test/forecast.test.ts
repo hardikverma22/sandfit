@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { CORPUS } from "../bench/corpus.js";
 import { currentClaudeModel } from "../src/current.js";
 import { analyze } from "../src/extract/extract.js";
-import { defaultModel, forecast, holdoutSplit, modelFromPolicy, runtimeProtected } from "../src/forecast.js";
+import { defaultModel, forecast, holdoutSplit, modelFromPolicy, runtimeProtected, staysSandboxed } from "../src/forecast.js";
 import { buildPolicy } from "../src/policy/build.js";
 import { renderExplain, renderSummary } from "../src/report.js";
 import type { AgentEvent } from "../src/types.js";
@@ -153,5 +153,38 @@ describe("report", () => {
     expect(plain(renderExplain(policy, "npm"))).toContain("registry.npmjs.org");
     expect(plain(renderExplain(policy, "npm"))).not.toContain("~/shared");
     expect(plain(renderExplain(policy, "zzz"))).toContain('No grant matches "zzz"');
+  });
+});
+
+describe("excluded commands, the way Claude Code matches them", () => {
+  // code.claude.com/docs/en/sandboxing: every command in the call must match, matching is on the
+  // text, and a cd, a redirect to a file, or $(...) keeps the whole call sandboxed. Seen on a real
+  // Mac: `cd repo && git fetch origin` ran sandboxed and failed although `git fetch *` was excluded.
+  const ex = ["git fetch", "git push", "docker"];
+
+  it("runs outside only when the whole call is excluded commands", () => {
+    for (const ok of ["git fetch", "git fetch origin", "git fetch && git push", "docker compose up -d", "git fetch 2>&1"]) expect(staysSandboxed(ok, ex, project, home)).toBeUndefined();
+    expect(staysSandboxed("cd /w/app && git fetch origin", ex, project, home)).toBe("it includes a cd");
+    expect(staysSandboxed("git fetch > log.txt", ex, project, home)).toBe("it redirects output to a file");
+    expect(staysSandboxed("git fetch $(git remote | head -1)", ex, project, home)).toContain("command substitution");
+    expect(staysSandboxed("npm ci && docker compose build", ex, project, home)).toContain("also runs `npm ci`");
+    expect(staysSandboxed("git -C ../lib fetch", ex, project, home)).toContain("not excluded as written");
+  });
+
+  it("the forecast counts a chained excluded command as blocked, and says why", () => {
+    const events = analyze([bashEvent("docker ps", project), bashEvent("cd /tmp && docker ps", project, { id: "2" })], { home });
+    const model = { ...defaultModel([project]), excluded: ["docker"] };
+    const r = forecast(events, model, home);
+    expect(r.excludedCalls).toBe(1);
+    expect(r.blockedCalls).toBe(1);
+    expect(r.blockers[0]!.key).toBe("exec-chained:docker");
+    expect(r.blockers[0]!.fix).toContain("because it includes a cd");
+    // Sandboxes that wrap the whole agent have no such rule.
+    expect(forecast(events, { ...model, scope: "process" }, home).excludedCalls).toBe(2);
+  });
+
+  it("writes exclusions the way the command was typed", () => {
+    const policy = buildPolicy(analyze([bashEvent("sudo apt install -y jq", project), bashEvent("/usr/local/bin/docker ps", project)], { home }), { home, projects: [project] });
+    expect(policy.excludedCommands.map((e) => e.pattern)).toEqual(["/usr/local/bin/docker *", "sudo apt *"]);
   });
 });

@@ -127,6 +127,9 @@ function shellNeeds(
   if (argv.length === 0) return;
 
   const prog = basename(argv[0]!);
+  // How the program was called, as written (`sudo apt`, `/usr/local/bin/docker`): Claude Code
+  // matches excludedCommands against the text of the call, so an exclusion must use this.
+  const invoked = cmd.argv.slice(0, cmd.argv.length - argv.length + 1).join(" ");
   const progKey = argv[0] === "./gradlew" ? "./gradlew" : prog;
   const args = argv.slice(1);
   const positional = args.filter((a) => !a.startsWith("-"));
@@ -225,8 +228,8 @@ function shellNeeds(
       for (const h of hosts) needs.push({ kind: "net", value: h, reason: `git ${sub}`, via: "shell", inferred: urlHosts.length === 0 });
       // Pushing, or talking to an SSH remote, needs your git credentials (SSH keys, keychain).
       const sshRemote = urlArgs.some((a) => /^[\w.-]+@[\w.-]+:|^ssh:\/\//.test(a)) || (urlArgs.length === 0 && gitUsesSsh(cmd.cwd));
-      if (sshRemote) needs.push({ kind: "exec", value: `git ${sub}`, reason: SSH_GIT_REASON, via: "shell" });
-      else if (sub === "push") needs.push({ kind: "exec", value: "git push", reason: "needs your git credentials (keychain or a token), which the sandbox protects", via: "shell" });
+      if (sshRemote) needs.push({ kind: "exec", value: `${invoked} ${sub}`, reason: SSH_GIT_REASON, via: "shell" });
+      else if (sub === "push") needs.push({ kind: "exec", value: `${invoked} push`, reason: "needs your git credentials (keychain or a token), which the sandbox protects", via: "shell" });
       if (sub === "clone" && positional.length >= 2) needs.push({ kind: "write", value: abs(positional[positional.length - 1]!), reason: "git clone", via: "shell" });
     }
     return;
@@ -262,7 +265,7 @@ function shellNeeds(
   if (k) {
     // A tool that cannot run sandboxed runs outside the sandbox: it needs no grants inside it.
     if (k.exclude) {
-      needs.push({ kind: "exec", value: prog, reason: k.exclude, via: "shell" });
+      needs.push({ kind: "exec", value: invoked, reason: k.exclude, via: "shell" });
       return;
     }
     const runnerSubs = RUNNERS[prog];

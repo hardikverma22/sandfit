@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { expandHome } from "./extract/extract.js";
+import { parseShell } from "./extract/shell.js";
 import { generalizeWrite, isInside, tempRoots, tildify, tooBroad } from "./policy/paths.js";
 import { redact } from "./redact.js";
 import type { AnalyzedEvent, Policy } from "./types.js";
@@ -69,6 +70,24 @@ export function defaultModel(projects: string[], scope: SandboxModel["scope"] = 
   return { scope, projects: [...projects], writeRoots: [...projects, ...tempRoots()], denyRead: [], denyWrite: runtimeProtected(projects), domains: [], localBinding: platform === "linux", sockets: [], excluded: [] };
 }
 
+/**
+ * Why Claude Code would keep a call that matches excludedCommands inside the sandbox, or undefined
+ * if it runs outside. From code.claude.com/docs/en/sandboxing: every command in the call has to
+ * match an entry, matching is on the text of the call, and a cd, a redirect to a file, or a command
+ * substitution keeps the whole call sandboxed.
+ */
+export function staysSandboxed(command: string, excluded: string[], cwd: string, home: string): string | undefined {
+  if (/\$\(|`|[<>]\(/.test(command)) return "it uses a command substitution such as $(...)";
+  const cmds = parseShell(command, { cwd, home }).filter((c) => c.argv.length);
+  if (cmds.some((c) => c.argv[0] === "cd" || c.argv[0] === "pushd")) return "it includes a cd";
+  if (cmds.some((c) => c.redirects.some((r) => r.op.includes(">") && !r.target.startsWith("&")))) return "it redirects output to a file";
+  for (const c of cmds) {
+    const text = c.argv.join(" ");
+    if (!excluded.some((e) => text === e || text.startsWith(`${e} `))) return `it also runs \`${c.argv.slice(0, 3).join(" ")}\`, which is not excluded as written`;
+  }
+  return undefined;
+}
+
 export function domainAllowed(host: string, patterns: string[]): boolean {
   return patterns.some((p) => {
     if (p === host) return true;
@@ -131,9 +150,13 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
     if (isShell && a.event.decision === "prompted") promptedBefore++;
     for (const u of a.unknownPrograms) unknown.set(u, (unknown.get(u) ?? 0) + 1);
 
+    let chained: string | undefined;
     if (relevant.some((n) => n.kind === "exec" && model.excluded.includes(n.value))) {
-      excludedCalls++;
-      continue;
+      chained = model.scope === "claude" && a.event.command ? staysSandboxed(a.event.command, model.excluded, a.event.cwd, home) : undefined;
+      if (!chained) {
+        excludedCalls++;
+        continue;
+      }
     }
 
     let blocked = false;
@@ -172,9 +195,11 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
           hit("bind:localhost", "bind", "allowLocalBinding: true", example);
         }
       } else if (n.kind === "exec") {
-        // Not excluded (we returned above if it was), so it runs inside and fails.
         blocked = true;
-        hit(`exec:${n.value}`, "exec", `excludedCommands: ${n.value} * (${n.reason})`, example);
+        if (chained && model.excluded.includes(n.value)) {
+          // Excluded, but the way it was called keeps it inside the sandbox.
+          hit(`exec-chained:${n.value}`, "exec", `runs inside the sandbox anyway, because ${chained}. Claude Code runs an excluded command outside the sandbox only when the call is that command on its own; ask the agent to run \`${n.value}\` by itself`, example);
+        } else hit(`exec:${n.value}`, "exec", `excludedCommands: ${n.value} * (${n.reason})`, example);
       } else if (n.kind === "socket") {
         if (!model.sockets.includes(n.value)) {
           blocked = true;
