@@ -165,6 +165,9 @@ describe("emit", () => {
     expect(tomlParse(sandfit(["emit", "-t", "codex"]).out)).toMatchObject({ sandbox_mode: "workspace-write" });
     expect(JSON.parse(sandfit(["emit", "-t", "nono", "--name", "work"]).out).meta.name).toBe("work");
     expect(yamlParse(sandfit(["emit", "-t", "policy"]).out).version).toBe(1);
+    const openshell = yamlParse(sandfit(["emit", "-t", "openshell", "--binary", "/usr/bin/node", "/usr/bin/git"]).out);
+    expect(openshell.network_policies.sandfit.endpoints).toContainEqual({ host: "docs.example.com", port: 443 }); // wraps the whole agent too
+    expect(openshell.network_policies.sandfit.binaries).toEqual([{ path: "/usr/bin/node" }, { path: "/usr/bin/git" }]);
   });
 
   it("writes to a file with -o", () => {
