@@ -14,6 +14,8 @@ function bar(n: number, d: number, width = 24): string {
 }
 
 const fmt = (n: number) => n.toLocaleString("en-US");
+/** "1 session", "2 sessions" */
+export const plural = (n: number, word: string, many = `${word}s`) => `${fmt(n)} ${n === 1 ? word : many}`;
 
 function list(items: string[], max = 6): string {
   if (items.length === 0) return pc.dim("none");
@@ -40,7 +42,7 @@ export function renderSummary(s: SummaryInput): string {
   const b = s.baseline;
   const w = s.withPolicy;
   out.push("");
-  out.push(`${pc.bold("sandfit")} ${pc.dim(s.version)}  ${pc.dim("·")}  read ${fmt(s.events)} tool calls from ${fmt(s.sessions)} sessions (${s.harnessLabel})${s.days ? ` ${pc.dim("·")} last ${s.days} days` : ""}`);
+  out.push(`${pc.bold("sandfit")} ${pc.dim(s.version)}  ${pc.dim("·")}  read ${plural(s.events, "tool call")} from ${plural(s.sessions, "session")} (${s.harnessLabel})${s.days ? ` ${pc.dim("·")} last ${s.days} days` : ""}`);
   out.push(pc.dim(`  ${s.scopeLabel}`));
   out.push("");
 
@@ -94,7 +96,8 @@ export function renderSummary(s: SummaryInput): string {
 
   out.push(pc.bold("  Next"));
   out.push(`  ${pc.green("sandfit apply")}                    write it to .claude/settings.json ${pc.dim("(keeps a backup)")}`);
-  out.push(`  ${pc.green("sandfit emit --target policy")}     review every grant and why it is there`);
+  out.push(`  ${pc.green("sandfit explain")}                  why each grant is there, with an example`);
+  out.push(`  ${pc.green("sandfit emit --target policy")}     the full policy file to review`);
   out.push(`  ${pc.green("sandfit emit --target srt|codex|nono")}  for other sandboxes`);
   out.push("");
   return out.join("\n");
@@ -115,4 +118,61 @@ export function renderBlockers(r: ForecastResult, title: string): string {
 function truncate(s: string, n: number): string {
   const one = s.replace(/\s+/g, " ").trim();
   return one.length > n ? one.slice(0, n - 1) + "…" : one;
+}
+
+const EXPLAIN_KINDS: Record<string, string> = {
+  net: "Network: hosts your agent's commands reached",
+  write: "Writes: folders outside the project your agent wrote to",
+  bind: "Local servers",
+  exclude: "Run outside the sandbox",
+  mcp: "MCP tools",
+};
+
+/** Why each grant is in the policy, with how often it was needed and one (redacted) example. */
+export function renderExplain(policy: Policy, filter?: string): string {
+  const inPolicy = (kind: string, value: string): boolean => {
+    const domains = [...policy.network.allowDomains, ...policy.harnessTools.allowFetch];
+    const writes = [...policy.filesystem.allowWrite, ...policy.harnessTools.allowWrite];
+    if (kind === "net") return domains.some((d) => d === value || (d.startsWith("*.") && value.endsWith(d.slice(1))));
+    if (kind === "write") return writes.some((w) => value === w || value.startsWith(w + "/"));
+    if (kind === "bind") return policy.network.allowLocalBinding;
+    if (kind === "exclude") return policy.excludedCommands.some((e) => e.pattern === `${value} *`);
+    if (kind === "mcp") return policy.mcp.allowTools.includes(value);
+    return false;
+  };
+  const groups = new Map<string, { value: string; count: number; example: string; kept: boolean }[]>();
+  for (const [key, ev] of Object.entries(policy.evidence)) {
+    const i = key.indexOf(":");
+    const kind = key.slice(0, i);
+    const value = key.slice(i + 1);
+    if (filter && !key.toLowerCase().includes(filter.toLowerCase())) continue;
+    const list = groups.get(kind) ?? [];
+    list.push({ value, count: ev.count, example: ev.example, kept: inPolicy(kind, value) });
+    groups.set(kind, list);
+  }
+  const out: string[] = [""];
+  if (groups.size === 0) {
+    out.push(filter ? `  No grant matches "${filter}". Run sandfit explain with no filter to see them all.` : "  The policy has no grants: no agent history was found.");
+    return out.join("\n");
+  }
+  for (const kind of Object.keys(EXPLAIN_KINDS)) {
+    const list = groups.get(kind);
+    if (!list) continue;
+    out.push(pc.bold(`  ${EXPLAIN_KINDS[kind]}`));
+    for (const g of list.sort((a, b) => b.count - a.count)) {
+      const reason = kind === "exclude" ? policy.excludedCommands.find((e) => e.pattern === `${g.value} *`)?.reason : undefined;
+      out.push(`  ${g.kept ? pc.green("✓") : pc.dim("–")} ${g.value}  ${pc.dim(`needed ${plural(g.count, "time")}${g.kept ? "" : ", left out (below --min-count)"}`)}`);
+      if (reason) out.push(`      ${pc.dim("why:")} ${reason}`);
+      out.push(`      ${pc.dim("e.g.")} ${truncate(g.example, 100)}`);
+    }
+    out.push("");
+  }
+  if (!filter) {
+    out.push(pc.bold("  Always denied"));
+    out.push(`  ${pc.dim("reading:")} ${policy.filesystem.denyRead.join(", ")}`);
+    out.push(`  ${pc.dim("writing:")} ${policy.filesystem.denyWrite.join(", ")}`);
+    for (const w of policy.warnings) out.push(`  ${pc.yellow("!")} ${w}`);
+    out.push("");
+  }
+  return out.join("\n");
 }
