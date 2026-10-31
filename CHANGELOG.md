@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-10-31)
 
 ### Added
 - `sandfit learn`: lists what a sandbox actually blocked in past sessions (hosts and paths named

@@ -96,7 +96,7 @@ This is real output on the [sample history](demo/sample-history.ts) used in the 
 (one week of a developer working on a Next.js app):
 
 ```text
-sandfit 0.3.1  ·  read 243 tool calls from 12 sessions (Claude Code) · last 30 days
+sandfit 0.4.0  ·  read 243 tool calls from 12 sessions (Claude Code) · last 30 days
   project ~/code/storefront
 
   If you turn on the sandbox today
