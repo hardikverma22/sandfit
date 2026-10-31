@@ -237,7 +237,8 @@ None of these is added for you: a blocked attempt can also be an attack (look at
 `sandfit apply --learn` asks about each, and Enter skips. sandfit never suggests secrets, shell
 startup files, the agent's own config or broad folders. It only uses errors that name the host or
 path (for example `Read-only file system` on Linux, `Operation not permitted` on macOS, or a failed
-lookup that names the host), so a blocked `curl` that only says `CONNECT tunnel failed` teaches it nothing.
+lookup that names the host, or Claude Code's own `deny network-outbound host` report). A blocked `curl`
+under plain sandbox-runtime only says `CONNECT tunnel failed`, so that teaches it nothing.
 
 ## Get told when your rules fall behind
 

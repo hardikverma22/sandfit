@@ -10,6 +10,15 @@
 - `sandfit drift --hook`: the same check as a Claude Code SessionStart hook. When the config is
   missing something, the session opens with a one-line warning. It always exits 0, and stays
   quiet in projects that never set the sandbox up.
+- `sandfit learn` reads Claude Code's own sandbox report (`deny network-outbound host:443`), so a
+  blocked `curl` inside Claude Code now teaches it the host. Captured on macOS with Claude Code 2.1.309.
+
+### Fixed
+- Git over SSH: when your history syncs with an SSH remote (`git push`, `pull` or `fetch` to
+  `git@github.com:...`), fetch, pull and push now all run outside the sandbox. Before, only the
+  commands seen in history did, so the first `git fetch` failed because the sandbox protects
+  `~/.ssh`. Found by testing on a real Mac. HTTPS remotes are unchanged: fetch works inside the
+  sandbox there.
 
 ## 0.4.0 (2026-10-31)
 
