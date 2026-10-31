@@ -153,12 +153,13 @@ npx sandfit explain github.com
 | **Anthropic sandbox-runtime** (`srt`) | `sandfit apply -t srt` | `~/.srt-settings.json`, then run `srt claude` |
 | **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml`. `--codex-profile` writes a per-website permission profile instead (beta in Codex); sandfit won't mix the two styles, since Codex then silently ignores one |
 | **nono** | `sandfit apply -t nono` | `~/.config/nono/profiles/sandfit.json`, then run `nono run --profile sandfit -- claude` |
+| **NVIDIA OpenShell** | `sandfit emit -t openshell -o policy.yaml` | A sandbox policy for `openshell sandbox create --policy policy.yaml --provider claude-code -- claude`. Network rules apply to your agent and everything it starts (`--binary` to name other programs) |
 | **Anything else** | `sandfit emit -t policy` | The rules as a YAML file, with how often each one was needed and an example |
 
 To see a config without writing it, use `emit` instead of `apply`:
 
 ```bash
-npx sandfit emit -t claude      # or srt, codex, nono, policy
+npx sandfit emit -t claude      # or srt, codex, nono, openshell, policy
 ```
 
 ## All commands
@@ -168,7 +169,7 @@ sandfit                     # summary: what breaks today, what breaks with the r
 sandfit forecast            # every command that would be blocked, grouped, with the fix
 sandfit explain [text]      # why each rule exists: how often it was needed, one example
 sandfit diff -t <target>    # what apply would change in your config, without writing
-sandfit emit -t <target>    # print the config (claude, srt, codex, nono, policy)
+sandfit emit -t <target>    # print the config (claude, srt, codex, nono, openshell, policy)
 sandfit apply -t <target>   # write it (shows the changes, asks first, keeps a backup)
 sandfit apply --review      # first keep or drop each grant your history needed only once
 sandfit learn               # what a sandbox blocked in past sessions, as suggestions
@@ -239,7 +240,7 @@ lookup that names the host), so a blocked `curl` that only says `CONNECT tunnel 
 
 - sandfit sees **commands**, not everything a command does inside. If a script calls an API sandfit has never heard of, that website is not in the rules until you run it once with the sandbox on; then `sandfit learn` picks it up from the error. sandfit lists such tools under "Tools sandfit has no knowledge of".
 - On **Linux**, every sandboxed command gets its own network, so a dev server started by one command cannot be reached by the next. That is how the sandbox works there, not something sandfit can change.
-- The Codex and nono configs are checked against those tools' published schemas, but only sandbox-runtime (which Claude Code's sandbox is built on) is tested by actually running commands.
+- The Codex, nono and OpenShell configs are checked against those tools' published schemas, but only sandbox-runtime (which Claude Code's sandbox is built on) is tested by actually running commands.
 
 ## Questions
 

@@ -7,7 +7,7 @@ import { Command, InvalidArgumentError, Option } from "commander";
 import pc from "picocolors";
 import { parse as tomlParse, stringify as tomlStringify } from "smol-toml";
 import { mergeSettings, toClaudeSettings } from "./emit/claude.js";
-import { toCodexToml, toNonoProfile, toPolicyYaml, toSrtSettings } from "./emit/others.js";
+import { toCodexToml, toNonoProfile, toOpenShellPolicy, toPolicyYaml, toSrtSettings } from "./emit/others.js";
 import { diffConfig, unusedEntries } from "./diff.js";
 import { forecast, modelFromPolicy } from "./forecast.js";
 import { plural, renderBlockers, renderChanges, renderDiff, renderExplain, renderLearn, renderSummary } from "./report.js";
@@ -17,7 +17,7 @@ import { run, type RunOptions } from "./run.js";
 import type { Harness, Policy } from "./types.js";
 import { VERSION } from "./version.js";
 
-const TARGETS = ["claude", "srt", "codex", "nono", "policy"] as const;
+const TARGETS = ["claude", "srt", "codex", "nono", "openshell", "policy"] as const;
 type Target = (typeof TARGETS)[number];
 
 function intArg(min: number) {
@@ -81,6 +81,8 @@ function render(target: Target, policy: Awaited<ReturnType<typeof run>>["policy"
       return toCodexToml(policy, { profile: !!o.codexProfile });
     case "nono":
       return JSON.stringify(toNonoProfile(policy, o.name ?? "sandfit"), null, 2) + "\n";
+    case "openshell":
+      return toOpenShellPolicy(policy, { binaries: o.binary });
     case "policy":
       return toPolicyYaml(policy);
   }
@@ -181,6 +183,7 @@ common(program.command("emit").description("print the policy for a sandbox"))
   .option("--strict-network", "Claude Code: refuse hosts outside the allowlist instead of prompting (user settings only, Claude Code v2.1.219+)")
   .option("--mask-credentials", "Claude Code: let commands use secret env vars your history sent to known hosts without seeing them (user settings only; experimental TLS termination)")
   .option("--name <name>", "profile name (nono)")
+  .option("--binary <paths...>", "OpenShell: programs the network rules apply to (default: your agent, e.g. /usr/local/bin/claude)")
   .option("-o, --out <file>", "write to a file instead of stdout")
   .action(async (o) => {
     const target = o.target as Target;

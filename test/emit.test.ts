@@ -2,7 +2,7 @@ import { parse as tomlParse } from "smol-toml";
 import { parse as yamlParse } from "yaml";
 import { describe, expect, it } from "vitest";
 import { mergeSettings, toClaudeSettings } from "../src/emit/claude.js";
-import { toCodexToml, toNonoProfile, toPolicyYaml, toSrtSettings } from "../src/emit/others.js";
+import { openshellHostOk, toCodexToml, toNonoProfile, toOpenShellPolicy, toPolicyYaml, toSrtSettings } from "../src/emit/others.js";
 import type { Policy } from "../src/types.js";
 
 function policy(over: Partial<Policy> = {}): Policy {
@@ -132,5 +132,72 @@ describe("credential masking", () => {
     const once = mergeSettings({}, gen);
     expect(mergeSettings(once, gen)).toEqual(once);
     expect((mergeSettings(once, gen) as any).sandbox.credentials.envVars).toHaveLength(1);
+  });
+});
+
+/** The rules from OpenShell's policy schema reference that a generated policy could break. */
+function openshellProblems(doc: any): string[] {
+  const out: string[] = [];
+  const allowed: Record<string, string[]> = { "": ["version", "filesystem_policy", "landlock", "process", "network_policies", "network_middlewares"], filesystem_policy: ["include_workdir", "read_only", "read_write"], landlock: ["compatibility"] };
+  for (const [where, keys] of Object.entries(allowed)) for (const k of Object.keys(where ? doc[where] ?? {} : doc)) if (!keys.includes(k)) out.push(`unknown field ${where}.${k}`);
+  if (doc.version !== 1) out.push("version must be 1");
+  const fs = doc.filesystem_policy;
+  const paths = [...fs.read_only, ...fs.read_write];
+  if (paths.length > 256) out.push("more than 256 paths");
+  for (const p of paths) if (!p.startsWith("/") || p.split("/").includes("..") || p.includes("*")) out.push(`bad path ${p}`);
+  if (fs.read_write.includes("/")) out.push("read_write contains /");
+  if (!["best_effort", "hard_requirement"].includes(doc.landlock.compatibility)) out.push("bad landlock");
+  for (const [key, rule] of Object.entries<any>(doc.network_policies ?? {})) {
+    if (key.startsWith("_provider_")) out.push("reserved rule key");
+    for (const k of Object.keys(rule)) if (!["name", "endpoints", "binaries"].includes(k)) out.push(`unknown rule field ${k}`);
+    if (!rule.binaries?.length) out.push("a rule without binaries allows nothing");
+    for (const b of rule.binaries) if (Object.keys(b).join() !== "path" || !b.path.startsWith("/")) out.push(`bad binary ${JSON.stringify(b)}`);
+    for (const e of rule.endpoints) {
+      if (!Number.isInteger(e.port) || e.port < 1 || e.port > 65535) out.push(`bad port on ${e.host}`);
+      if (!openshellHostOk(e.host)) out.push(`bad host ${e.host}`);
+    }
+  }
+  return out;
+}
+
+describe("OpenShell policy", () => {
+  const p = () =>
+    policy({
+      filesystem: { allowWrite: ["~/.npm", "/opt/data", "./build", "/tmp/x", "/", "/a/../b", "/data/*"], denyRead: ["~/.ssh"], denyWrite: [] },
+      network: { allowDomains: ["registry.npmjs.org", "*.githubusercontent.com", "*.io", "10.0.0.5"], denyDomains: [], allowLocalBinding: true, allowUnixSockets: [] },
+      source: { harnesses: ["claude", "codex"], sessions: 2, events: 10 },
+    });
+
+  it("is a valid OpenShell policy: allowlist only, absolute paths, one rule per agent binary", () => {
+    const text = toOpenShellPolicy(p());
+    const doc = yamlParse(text) as any;
+    expect(openshellProblems(doc)).toEqual([]);
+    expect(doc.filesystem_policy.include_workdir).toBe(true);
+    // ~/.npm and ./build are inside /sandbox already; "/" , "..", globs and temp paths are not written.
+    expect(doc.filesystem_policy.read_write).toEqual(["/sandbox", "/tmp", "/dev/null", "/opt/data"]);
+    expect(doc.network_policies.sandfit.endpoints).toEqual([
+      { host: "registry.npmjs.org", port: 443 },
+      { host: "*.githubusercontent.com", port: 443 },
+      { host: "10.0.0.5", port: 443 },
+      { host: "docs.example.com", port: 443 },
+    ]);
+    expect(doc.network_policies.sandfit.binaries).toEqual([{ path: "/usr/local/bin/claude" }, { path: "/usr/local/bin/codex" }]);
+    expect(text).toContain("Left out (OpenShell needs at least three labels in a wildcard host): *.io");
+    expect(text).toContain("may fail here: docker *");
+    expect(JSON.stringify(doc)).not.toContain(".ssh");
+  });
+
+  it("takes custom binaries, and drops the network section when nothing needs the network", () => {
+    const doc = yamlParse(toOpenShellPolicy(p(), { binaries: ["/usr/bin/node"] })) as any;
+    expect(doc.network_policies.sandfit.binaries).toEqual([{ path: "/usr/bin/node" }]);
+    expect(() => toOpenShellPolicy(p(), { binaries: ["node"] })).toThrow("absolute");
+    const offline = yamlParse(toOpenShellPolicy(policy({ network: { ...policy().network, allowDomains: [] }, harnessTools: { allowWrite: [], allowFetch: [] } }))) as any;
+    expect(offline.network_policies).toBeUndefined();
+    expect(openshellProblems(offline)).toEqual([]);
+  });
+
+  it("checks wildcard hosts the way OpenShell does", () => {
+    for (const ok of ["api.example.com", "*.example.com", "*-api.example.com", "api.*.example.com", "**.example.com"]) expect(openshellHostOk(ok)).toBe(true);
+    for (const bad of ["*.com", "**.com", "api.**.example.com", "a*b.*x.com", "localhost", "a..com"]) expect(openshellHostOk(bad)).toBe(false);
   });
 });

@@ -21,6 +21,12 @@
   `sandbox.network.tlsTerminate`. Only variable names are recorded, never values. Variables used
   only locally are not masked.
 - `sandfit explain env` shows each secret variable and the hosts it was sent to.
+- `--target openshell`: an NVIDIA OpenShell sandbox policy (`openshell sandbox create --policy`). It
+  lists the hosts your commands needed as one network rule for your agent's binary, which OpenShell
+  extends to every process the agent starts (`--binary` names other programs). OpenShell allows only
+  what is listed and keeps home and the project under `/sandbox`, so the file adds only writable
+  folders outside it. Wildcard hosts OpenShell would reject are left out with a note. Emit only:
+  OpenShell takes the policy when a sandbox is created.
 
 ### Changed
 - Claude Code settings now include `sandbox.failIfUnavailable: true`. Without it, Claude Code runs
