@@ -40,6 +40,7 @@ export function diffConfig(before: unknown, after: unknown, path = ""): ConfigCh
 
 /** Every leaf under a value, as additions (or plain entries to be relabelled by the caller). */
 function leaves(v: unknown, path: string, isNew = false): ConfigChange[] {
+  if (isObj(v) && Object.keys(v).length === 0) return [{ path, kind: "set", value: "{}", ...(isNew ? { from: "unset" } : {}) }];
   if (isObj(v)) return Object.entries(v).flatMap(([k, x]) => leaves(x, `${path}.${k}`, isNew));
   if (Array.isArray(v)) return v.map((x) => ({ path, kind: "add" as const, value: show(x) }));
   return [{ path, kind: "set", value: show(v), ...(isNew ? { from: "unset" } : {}) }];

@@ -212,6 +212,14 @@ exports[`policy > builds the expected policy from Claude Code history 1`] = `
       "count": 1,
       "example": "cd web && pnpm run dev > /tmp/dev.log 2>&1 &",
     },
+    "env:NODE_AUTH_TOKEN": {
+      "count": 1,
+      "example": "npm install && npm test",
+    },
+    "env:NPM_TOKEN": {
+      "count": 1,
+      "example": "npm install && npm test",
+    },
     "exclude:docker": {
       "count": 1,
       "example": "docker compose up -d",
@@ -303,6 +311,20 @@ exports[`policy > builds the expected policy from Claude Code history 1`] = `
     ],
     "allowWrite": [],
   },
+  "maskEnv": [
+    {
+      "hosts": [
+        "registry.npmjs.org",
+      ],
+      "name": "NODE_AUTH_TOKEN",
+    },
+    {
+      "hosts": [
+        "registry.npmjs.org",
+      ],
+      "name": "NPM_TOKEN",
+    },
+  ],
   "mcp": {
     "allowTools": [
       "mcp__github__create_issue",

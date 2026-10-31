@@ -20,6 +20,8 @@ export interface ToolKnowledge {
   exclude?: string;
   /** Secret files the tool reads during normal use (only matters if the file exists). */
   readsSecrets?: string[];
+  /** Environment variables holding the tool's token; it sends them to `hosts`. */
+  tokenEnv?: string[];
 }
 
 const NPM_HOSTS = ["registry.npmjs.org"];
@@ -30,12 +32,12 @@ const GITHUB = ["github.com", "api.github.com", "codeload.github.com", "objects.
 const NPM_INSTALL = ["install", "i", "ci", "add", "update", "up", "upgrade", "outdated", "view", "info", "show", "publish", "audit", "exec", "dlx", "create", "init", "x", "remove", "rm", "uninstall", "dedupe", "fetch"];
 
 export const KNOWLEDGE: Record<string, ToolKnowledge> = {
-  npm: { readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, netSubcommands: NPM_INSTALL, writes: ["~/.npm"], bindSubcommands: ["start", "dev", "serve", "preview"] },
-  npx: { readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, writes: ["~/.npm"] },
-  pnpm: { readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, netSubcommands: NPM_INSTALL, writes: ["~/Library/pnpm", "~/.local/share/pnpm", "~/.cache/pnpm", "~/Library/Caches/pnpm"], bindSubcommands: ["start", "dev", "serve", "preview"] },
-  yarn: { readsSecrets: ["~/.npmrc"], hosts: ["registry.yarnpkg.com", ...NPM_HOSTS], netSubcommands: ["", ...NPM_INSTALL], writes: ["~/.yarn", "~/Library/Caches/Yarn", "~/.cache/yarn"], bindSubcommands: ["start", "dev", "serve", "preview"] },
-  bun: { readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, netSubcommands: NPM_INSTALL, writes: ["~/.bun"], bindSubcommands: ["dev", "start", "serve", "preview"] },
-  bunx: { readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, writes: ["~/.bun"] },
+  npm: { tokenEnv: ["NPM_TOKEN", "NODE_AUTH_TOKEN"], readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, netSubcommands: NPM_INSTALL, writes: ["~/.npm"], bindSubcommands: ["start", "dev", "serve", "preview"] },
+  npx: { tokenEnv: ["NPM_TOKEN", "NODE_AUTH_TOKEN"], readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, writes: ["~/.npm"] },
+  pnpm: { tokenEnv: ["NPM_TOKEN", "NODE_AUTH_TOKEN"], readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, netSubcommands: NPM_INSTALL, writes: ["~/Library/pnpm", "~/.local/share/pnpm", "~/.cache/pnpm", "~/Library/Caches/pnpm"], bindSubcommands: ["start", "dev", "serve", "preview"] },
+  yarn: { tokenEnv: ["NPM_TOKEN", "NODE_AUTH_TOKEN"], readsSecrets: ["~/.npmrc"], hosts: ["registry.yarnpkg.com", ...NPM_HOSTS], netSubcommands: ["", ...NPM_INSTALL], writes: ["~/.yarn", "~/Library/Caches/Yarn", "~/.cache/yarn"], bindSubcommands: ["start", "dev", "serve", "preview"] },
+  bun: { tokenEnv: ["NPM_TOKEN", "NODE_AUTH_TOKEN"], readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, netSubcommands: NPM_INSTALL, writes: ["~/.bun"], bindSubcommands: ["dev", "start", "serve", "preview"] },
+  bunx: { tokenEnv: ["NPM_TOKEN", "NODE_AUTH_TOKEN"], readsSecrets: ["~/.npmrc"], hosts: NPM_HOSTS, writes: ["~/.bun"] },
   deno: { hosts: ["deno.land", "jsr.io", ...NPM_HOSTS], writes: ["~/Library/Caches/deno", "~/.cache/deno"] },
   pip: { hosts: PY_HOSTS, netSubcommands: ["install", "download", "index", "wheel"], writes: ["~/Library/Caches/pip", "~/.cache/pip"] },
   pip3: { hosts: PY_HOSTS, netSubcommands: ["install", "download", "index", "wheel"], writes: ["~/Library/Caches/pip", "~/.cache/pip"] },
@@ -54,15 +56,15 @@ export const KNOWLEDGE: Record<string, ToolKnowledge> = {
   "./gradlew": { hosts: ["services.gradle.org", "plugins.gradle.org", "repo.maven.apache.org"], writes: ["~/.gradle"] },
   brew: { hosts: ["formulae.brew.sh", "ghcr.io", "pkg-containers.githubusercontent.com", "github.com"], netSubcommands: ["install", "upgrade", "update", "fetch", "reinstall", "tap", "search", "info"], writes: ["~/Library/Caches/Homebrew", "/opt/homebrew", "/usr/local/Homebrew"] },
   gh: { hosts: GITHUB, writes: ["~/.config/gh"], exclude: "uses your GitHub token, which the sandbox keeps unreadable" },
-  hf: { hosts: ["huggingface.co", "cdn-lfs.huggingface.co"], writes: ["~/.cache/huggingface"] },
-  "huggingface-cli": { hosts: ["huggingface.co", "cdn-lfs.huggingface.co"], writes: ["~/.cache/huggingface"] },
-  vercel: { hosts: ["api.vercel.com", "vercel.com"], writes: ["~/Library/Application Support/com.vercel.cli", "~/.local/share/com.vercel.cli"] },
-  netlify: { hosts: ["api.netlify.com"], writes: ["~/Library/Preferences/netlify", "~/.config/netlify"] },
-  wrangler: { hosts: ["api.cloudflare.com", "dash.cloudflare.com"], writes: ["~/.wrangler", "~/Library/Preferences/.wrangler"] },
-  supabase: { hosts: ["api.supabase.com"], writes: ["~/.supabase"] },
-  flyctl: { hosts: ["api.fly.io"], writes: ["~/.fly"] },
-  fly: { hosts: ["api.fly.io"], writes: ["~/.fly"] },
-  stripe: { hosts: ["api.stripe.com"], writes: ["~/.config/stripe"] },
+  hf: { tokenEnv: ["HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"], hosts: ["huggingface.co", "cdn-lfs.huggingface.co"], writes: ["~/.cache/huggingface"] },
+  "huggingface-cli": { tokenEnv: ["HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"], hosts: ["huggingface.co", "cdn-lfs.huggingface.co"], writes: ["~/.cache/huggingface"] },
+  vercel: { tokenEnv: ["VERCEL_TOKEN"], hosts: ["api.vercel.com", "vercel.com"], writes: ["~/Library/Application Support/com.vercel.cli", "~/.local/share/com.vercel.cli"] },
+  netlify: { tokenEnv: ["NETLIFY_AUTH_TOKEN"], hosts: ["api.netlify.com"], writes: ["~/Library/Preferences/netlify", "~/.config/netlify"] },
+  wrangler: { tokenEnv: ["CLOUDFLARE_API_TOKEN"], hosts: ["api.cloudflare.com", "dash.cloudflare.com"], writes: ["~/.wrangler", "~/Library/Preferences/.wrangler"] },
+  supabase: { tokenEnv: ["SUPABASE_ACCESS_TOKEN"], hosts: ["api.supabase.com"], writes: ["~/.supabase"] },
+  flyctl: { tokenEnv: ["FLY_API_TOKEN"], hosts: ["api.fly.io"], writes: ["~/.fly"] },
+  fly: { tokenEnv: ["FLY_API_TOKEN"], hosts: ["api.fly.io"], writes: ["~/.fly"] },
+  stripe: { tokenEnv: ["STRIPE_API_KEY"], hosts: ["api.stripe.com"], writes: ["~/.config/stripe"] },
   playwright: { hosts: ["cdn.playwright.dev", "playwright.download.prss.microsoft.com"], netSubcommands: ["install"], writes: ["~/Library/Caches/ms-playwright", "~/.cache/ms-playwright"] },
   docker: { sockets: ["/var/run/docker.sock"], exclude: "needs the Docker daemon socket, which a sandbox cannot safely expose" },
   podman: { exclude: "needs the container runtime outside the sandbox" },

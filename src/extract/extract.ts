@@ -72,6 +72,9 @@ function analyzeOne(event: AgentEvent, home: string, gitHosts: (cwd: string) => 
       cmds = [];
     }
     for (const cmd of cmds) shellNeeds(cmd, home, gitHosts, needs, unknownPrograms, 0);
+    // A secret variable used in a command that talks to hosts: that is where its value goes.
+    const hosts = [...new Set(needs.filter((n) => n.kind === "net").map((n) => n.value))];
+    if (hosts.length) for (const name of secretEnvRefs(event.command)) needs.push({ kind: "env", value: name, hosts, reason: "used in a command that reaches these hosts", via: "shell" });
   } else if (event.tool === "read") {
     for (const p of event.paths ?? []) needs.push({ kind: "read", value: resolvePath(event.cwd, expandHome(p, home)), reason: event.toolName, via: "tool" });
   } else if (event.tool === "write") {
@@ -267,6 +270,7 @@ function shellNeeds(
     if (k.hosts && subMatches) for (const h of k.hosts) needs.push({ kind: "net", value: h, reason: `${prog}${csub ? " " + csub : ""}`, via: "shell", inferred: true });
     if (k.writes && subMatches) for (const w of k.writes.filter((x) => existsSync(expandHome(x, home)))) needs.push({ kind: "write", value: expandHome(w, home), reason: `${prog} cache`, via: "shell", inferred: true });
     if (k.sockets) for (const s of k.sockets) needs.push({ kind: "socket", value: s, reason: prog, via: "shell", inferred: true });
+    if (k.tokenEnv && k.hosts && subMatches) for (const t of k.tokenEnv) needs.push({ kind: "env", value: t, hosts: k.hosts, reason: `${prog} sends it`, via: "shell", inferred: true });
     if (k.readsSecrets) for (const r of k.readsSecrets.filter((x) => existsSync(expandHome(x, home)))) needs.push({ kind: "read", value: expandHome(r, home), reason: `${prog} reads its config`, via: "shell", inferred: true });
     const runScript = (csub === "run" || csub === "run-script") ? clean[1] ?? "" : csub;
     if (k.bindSubcommands && (k.bindSubcommands.includes("*") || k.bindSubcommands.includes(csub) || DEV_SCRIPT.test(runScript))) {
@@ -492,11 +496,25 @@ function plausible(n: Need): boolean {
 }
 
 function dedupe(needs: Need[]): Need[] {
-  const seen = new Set<string>();
+  const seen = new Map<string, Need>();
   return needs.filter((n) => {
     const k = `${n.kind}|${n.value}|${n.via}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
+    const prev = seen.get(k);
+    if (prev) {
+      if (n.hosts) prev.hosts = [...new Set([...(prev.hosts ?? []), ...n.hosts])];
+      return false;
+    }
+    seen.set(k, n.hosts ? { ...n } : n);
     return true;
-  });
+  }).map((n) => seen.get(`${n.kind}|${n.value}|${n.via}`)!);
+}
+
+/** Names that look like they hold a credential: OPENAI_API_KEY, GITHUB_TOKEN, DB_PASSWORD … */
+const SECRET_ENV = /^[A-Z][A-Z0-9_]*(TOKEN|_KEY|KEY_ID|SECRET|PASSWORD|PASSWD|_PAT|CREDENTIALS?|_AUTH)$/;
+
+/** Secret-looking environment variables a command expands ($NAME or ${NAME}); never their values. */
+export function secretEnvRefs(command: string): string[] {
+  const out = new Set<string>();
+  for (const m of command.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g)) if (SECRET_ENV.test(m[1]!)) out.add(m[1]!);
+  return [...out];
 }

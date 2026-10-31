@@ -106,3 +106,29 @@ describe("mergeSettings", () => {
     expect(mergeSettings(once, gen)).toEqual(once);
   });
 });
+
+describe("credential masking", () => {
+  const masked = () => policy({ maskEnv: [{ name: "OPENAI_API_KEY", hosts: ["api.openai.com"] }], network: { ...policy().network, allowDomains: ["registry.npmjs.org", "api.openai.com"] } });
+
+  it("masks secret variables for user settings, with TLS termination the proxy needs", () => {
+    const s = toClaudeSettings(masked(), { user: true, maskCredentials: true }) as any;
+    expect(s.sandbox.network.tlsTerminate).toEqual({});
+    // The shape documented at code.claude.com/docs/en/sandboxing#mask-credentials.
+    expect(s.sandbox.credentials).toEqual({ envVars: [{ name: "OPENAI_API_KEY", mode: "mask", injectHosts: ["api.openai.com"] }] });
+  });
+
+  it("is off unless asked, refused for project settings, and adds nothing when there is nothing to mask", () => {
+    expect((toClaudeSettings(masked()) as any).sandbox.credentials).toBeUndefined();
+    expect(() => toClaudeSettings(masked(), { maskCredentials: true })).toThrow("user settings");
+    const none = toClaudeSettings(policy(), { user: true, maskCredentials: true }) as any;
+    expect(none.sandbox.credentials).toBeUndefined();
+    expect(none.sandbox.network.tlsTerminate).toBeUndefined();
+  });
+
+  it("re-applying does not duplicate credential entries", () => {
+    const gen = toClaudeSettings(masked(), { user: true, maskCredentials: true });
+    const once = mergeSettings({}, gen);
+    expect(mergeSettings(once, gen)).toEqual(once);
+    expect((mergeSettings(once, gen) as any).sandbox.credentials.envVars).toHaveLength(1);
+  });
+});

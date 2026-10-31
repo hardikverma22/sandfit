@@ -29,7 +29,7 @@ export interface AgentEvent {
   failed?: boolean;
 }
 
-export type NeedKind = "read" | "write" | "net" | "bind" | "socket" | "mcp" | "exec";
+export type NeedKind = "read" | "write" | "net" | "bind" | "socket" | "mcp" | "exec" | "env";
 
 /** A single capability that an event needed in order to succeed. */
 export interface Need {
@@ -46,6 +46,8 @@ export interface Need {
    * the OS sandbox, but whole-process sandboxes (nono, srt wrapping the agent) still see them.
    */
   via: "shell" | "tool";
+  /** For "env": the hosts the credential in this environment variable was sent to. */
+  hosts?: string[];
 }
 
 export interface AnalyzedEvent {
@@ -91,6 +93,12 @@ export interface Policy {
    * sandbox and are governed by permission rules instead). Whole-process sandboxes merge these in.
    */
   harnessTools: { allowWrite: string[]; allowFetch: string[] };
+  /**
+   * Secret environment variables the history sent to specific hosts (a $TOKEN in a curl, NPM_TOKEN
+   * for npm). Claude Code can mask these: commands see a placeholder and the sandbox proxy puts the
+   * real value back only on requests to `hosts`. Only names are recorded, never values.
+   */
+  maskEnv?: { name: string; hosts: string[] }[];
   /** Trade-offs a human should know about (e.g. a secret left readable because a tool needs it). */
   warnings: string[];
   /** Evidence for every grant, so a human can review why it is there. */

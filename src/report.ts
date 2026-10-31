@@ -128,6 +128,7 @@ const EXPLAIN_KINDS: Record<string, string> = {
   bind: "Local servers",
   exclude: "Run outside the sandbox",
   mcp: "MCP tools",
+  env: "Secret environment variables (masked with --mask-credentials, released only to these hosts)",
 };
 
 /** Why each grant is in the policy, with how often it was needed and one (redacted) example. */
@@ -140,6 +141,7 @@ export function renderExplain(policy: Policy, filter?: string): string {
     if (kind === "bind") return policy.network.allowLocalBinding;
     if (kind === "exclude") return policy.excludedCommands.some((e) => e.pattern === `${value} *`);
     if (kind === "mcp") return policy.mcp.allowTools.includes(value);
+    if (kind === "env") return !!policy.maskEnv?.some((m) => m.name === value);
     return false;
   };
   const groups = new Map<string, { value: string; count: number; example: string; kept: boolean }[]>();
@@ -163,8 +165,10 @@ export function renderExplain(policy: Policy, filter?: string): string {
     out.push(pc.bold(`  ${EXPLAIN_KINDS[kind]}`));
     for (const g of list.sort((a, b) => b.count - a.count)) {
       const reason = kind === "exclude" ? policy.excludedCommands.find((e) => e.pattern === `${g.value} *`)?.reason : undefined;
-      out.push(`  ${g.kept ? pc.green("✓") : pc.dim("–")} ${g.value}  ${pc.dim(`needed ${plural(g.count, "time")}${g.kept ? "" : ", left out (below --min-count)"}`)}`);
+      out.push(`  ${g.kept ? pc.green("✓") : pc.dim("–")} ${g.value}  ${pc.dim(`needed ${plural(g.count, "time")}${g.kept ? "" : kind === "env" ? ", not masked (none of its hosts are allowed, or below --min-count)" : ", left out (below --min-count)"}`)}`);
       if (reason) out.push(`      ${pc.dim("why:")} ${reason}`);
+      const hosts = kind === "env" ? policy.maskEnv?.find((m) => m.name === g.value)?.hosts : undefined;
+      if (hosts) out.push(`      ${pc.dim("sent to:")} ${hosts.join(", ")}`);
       out.push(`      ${pc.dim("e.g.")} ${truncate(g.example, 100)}`);
     }
     out.push("");
