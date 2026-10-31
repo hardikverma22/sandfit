@@ -322,3 +322,25 @@ describe("learn", () => {
     expect(sandfit(["learn"]).out).toContain("No sandbox blocks found");
   });
 });
+
+describe("codex: the two config styles never mix", () => {
+  const cfg = () => join(home, ".codex", "config.toml");
+
+  it("refuses a permission profile on top of sandbox_mode, and the reverse", () => {
+    mkdirSync(join(home, ".codex"), { recursive: true });
+    writeFileSync(cfg(), 'sandbox_mode = "workspace-write"\n');
+    const r = sandfit(["apply", "-t", "codex", "--codex-profile", "-y"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("ignores permission profiles while sandbox_mode is set");
+    expect(readFileSync(cfg(), "utf8")).toBe('sandbox_mode = "workspace-write"\n');
+
+    writeFileSync(cfg(), 'default_permissions = "mine"\n');
+    expect(sandfit(["apply", "-t", "codex", "-y"]).err).toContain("Use --codex-profile");
+
+    writeFileSync(cfg(), 'model = "o3"\n');
+    expect(sandfit(["apply", "-t", "codex", "--codex-profile", "-y"]).code).toBe(0);
+    const written = tomlParse(readFileSync(cfg(), "utf8")) as any;
+    expect(written).toMatchObject({ model: "o3", default_permissions: "sandfit", features: { network_proxy: true }, permissions: { sandfit: { extends: ":workspace" } } });
+    expect(written.sandbox_mode).toBeUndefined();
+  });
+});

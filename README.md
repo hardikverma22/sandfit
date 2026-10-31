@@ -151,7 +151,7 @@ npx sandfit explain github.com
 |---|---|---|
 | **Claude Code** `/sandbox` | `sandfit apply` | Sandbox rules and secret `deny` rules merged into `.claude/settings.json` (add `--user` for `~/.claude/settings.json`, and there `--strict-network` to refuse unlisted hosts and `--mask-credentials` to mask tokens) |
 | **Anthropic sandbox-runtime** (`srt`) | `sandfit apply -t srt` | `~/.srt-settings.json`, then run `srt claude` |
-| **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml` (`--codex-profile` for per-website rules) |
+| **Codex CLI** | `sandfit apply -t codex` | `workspace-write` mode with the folders and network you need, in `~/.codex/config.toml`. `--codex-profile` writes a per-website permission profile instead (beta in Codex); sandfit won't mix the two styles, since Codex then silently ignores one |
 | **nono** | `sandfit apply -t nono` | `~/.config/nono/profiles/sandfit.json`, then run `nono run --profile sandfit -- claude` |
 | **Anything else** | `sandfit emit -t policy` | The rules as a YAML file, with how often each one was needed and an example |
 

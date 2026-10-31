@@ -30,6 +30,12 @@
 
 ### Fixed
 - Re-applying no longer duplicates list entries that are objects (such as credential entries).
+- `--codex-profile` now writes what Codex's permission profiles need: `extends = ":workspace"` (so
+  the project is writable and `.git/`, `.codex/` stay read-only) and `features.network_proxy = true`
+  (without it Codex does not enforce the per-domain rules).
+- `apply -t codex` refuses to mix the two Codex config styles: a profile on top of `sandbox_mode`
+  (Codex would ignore the profile) or `sandbox_mode` on top of a profile (Codex would ignore the
+  profile you had). Nothing is written in either case.
 
 ## 0.3.1 (2026-10-31)
 

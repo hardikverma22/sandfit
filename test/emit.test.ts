@@ -69,6 +69,8 @@ describe("other targets", () => {
     expect(classic.sandbox_workspace_write).toEqual({ network_access: true, writable_roots: ["~/.npm", "/opt/data", "~/notes"] });
     expect(toCodexToml(policy())).toContain("# registry.npmjs.org");
     const profile = tomlParse(toCodexToml(policy(), { profile: true })) as any;
+    expect(profile.permissions.sandfit.extends).toBe(":workspace");
+    expect(profile.features).toEqual({ network_proxy: true });
     expect(profile.permissions.sandfit.network).toEqual({ enabled: true, domains: { "registry.npmjs.org": "allow" } });
     expect(profile.permissions.sandfit.filesystem["~/.ssh"]).toBe("deny");
     const offline = tomlParse(toCodexToml(policy({ network: { ...policy().network, allowDomains: [] } }))) as any;

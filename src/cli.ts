@@ -224,6 +224,13 @@ function planFor(target: Target, policy: Policy, projects: string[], o: any): Pl
   if (target === "codex") {
     const file = join(process.env.CODEX_HOME || join(home, ".codex"), "config.toml");
     const before = readConfig(file, "toml");
+    // Codex treats the two styles as mutually exclusive; mixing them makes one silently win.
+    if (o.codexProfile && ("sandbox_mode" in before || "sandbox_workspace_write" in before)) {
+      throw new Error(`${file} uses sandbox_mode, and Codex ignores permission profiles while sandbox_mode is set. Remove sandbox_mode and [sandbox_workspace_write] from it first, or drop --codex-profile.`);
+    }
+    if (!o.codexProfile && "default_permissions" in before) {
+      throw new Error(`${file} uses permission profiles (default_permissions). Writing sandbox_mode would make Codex ignore them. Use --codex-profile, or remove default_permissions first.`);
+    }
     const generated = tomlParse(toCodexToml(policy, { profile: !!o.codexProfile })) as Record<string, unknown>;
     const after = mergeSettings(before, generated);
     return { file, before, after, generated, text: tomlStringify(after) + "\n", replaces: false };
