@@ -1,0 +1,45 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 44px;
+    }
+    #cta-name {
+      font-size: 150px;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+    }
+    #cta-cmd {
+      font-family: var(--font-mono);
+      font-size: 56px;
+      padding: 26px 56px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+    }
+    #cta-cmd span {
+      color: var(--ok);
+    }
+    #cta-sub {
+      font-size: 34px;
+      color: var(--dim);
+    }
+  </style>
+  <div id="root" data-composition-id="cta" data-width="1920" data-height="1080">
+    <div id="cta-name">sandfit</div>
+    <div id="cta-cmd"><span>$</span> npx sandfit</div>
+    <div id="cta-sub">Your history never leaves your machine.</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#cta-name", { opacity: 0.3, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.25, ease: "power4.out" }, 0.1);
+    tl.fromTo("#cta-cmd", { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, duration: 0.5, ease: "expo.out" }, 0.55);
+    tl.fromTo("#cta-sub", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 1.1);
+    window.__timelines["cta"] = tl;
+  </script>
+</template>

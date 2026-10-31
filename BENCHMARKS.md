@@ -27,8 +27,8 @@ _bench/corpus.ts: sandfit was improved against these_
 | Must run outside sandbox | 100.0% | 100.0% | 16 | 0 | 0 |
 | Network hosts | 100.0% | 100.0% | 76 | 0 | 0 |
 | Secret reads | 100.0% | 100.0% | 8 | 0 | 0 |
-| Writes outside project | 100.0% | 98.5% | 64 | 0 | 1 |
-| **All** | **100.0%** | **99.5%** | 182 | 0 | 1 |
+| Writes outside project | 100.0% | 98.5% | 65 | 0 | 1 |
+| **All** | **100.0%** | **99.5%** | 183 | 0 | 1 |
 
 Not fully right:
 
@@ -65,9 +65,9 @@ Node v22.23.4 · Intel(R) Xeon(R) Processor @ 2.10GHz · 4 cores
 
 | Tool calls | Transcript size | Read files | Work out needs | Build policy | Forecast (×2) | Total | Tool calls/s | Peak memory |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1,000 | 13 MB in 5 files | 51 ms | 16 ms | 17 ms | 11 ms | **96 ms** | 10,440 | 130 MB |
-| 10,000 | 127 MB in 50 files | 340 ms | 83 ms | 61 ms | 90 ms | **574 ms** | 17,429 | 176 MB |
-| 100,000 | 1270 MB in 500 files | 3.78 s | 779 ms | 541 ms | 492 ms | **5.59 s** | 17,887 | 374 MB |
+| 1,000 | 13 MB in 5 files | 68 ms | 28 ms | 30 ms | 14 ms | **140 ms** | 7,155 | 152 MB |
+| 10,000 | 127 MB in 50 files | 383 ms | 110 ms | 80 ms | 85 ms | **658 ms** | 15,196 | 192 MB |
+| 100,000 | 1270 MB in 500 files | 3.05 s | 629 ms | 591 ms | 550 ms | **4.82 s** | 20,733 | 350 MB |
 
 ## 3. Does the forecast match a real sandbox?
 

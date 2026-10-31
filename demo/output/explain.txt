@@ -1,0 +1,52 @@
+
+  Network: hosts your agent's commands reached
+  ✓ registry.npmjs.org  needed 44 times
+      e.g. npx tsc --noEmit
+  ✓ github.com  needed 11 times
+      e.g. git pull --rebase
+  ✓ binaries.prisma.sh  needed 3 times
+      e.g. npx prisma migrate dev
+  ✓ api.vercel.com  needed 2 times
+      e.g. vercel --prod
+  ✓ vercel.com  needed 2 times
+      e.g. vercel --prod
+  ✓ api.github.com  needed 2 times
+      e.g. curl -s https://api.github.com/repos/vercel/next.js/releases/latest
+  ✓ cdn.playwright.dev  needed 1 time
+      e.g. npx playwright install chromium
+  ✓ playwright.download.prss.microsoft.com  needed 1 time
+      e.g. npx playwright install chromium
+  ✓ pypi.org  needed 1 time
+      e.g. pip install -r scripts/requirements.txt
+  ✓ files.pythonhosted.org  needed 1 time
+      e.g. pip install -r scripts/requirements.txt
+
+  Writes: folders outside the project your agent wrote to
+  ✓ ~/.npm  needed 44 times
+      e.g. npx tsc --noEmit
+  ✓ ~/notes  needed 8 times
+      e.g. mkdir -p ~/notes && echo '- fixed auth redirect' >> ~/notes/standup.md
+  ✓ ~/.cache/ms-playwright  needed 1 time
+      e.g. npx playwright install chromium
+  ✓ ~/.cache/pip  needed 1 time
+      e.g. pip install -r scripts/requirements.txt
+
+  Local servers
+  ✓ localhost  needed 18 times
+      e.g. curl -s localhost:3000/api/health
+
+  Run outside the sandbox
+  ✓ git push  needed 6 times
+      why: needs your git credentials (SSH keys or keychain), which the sandbox protects
+      e.g. git push origin HEAD
+  ✓ docker  needed 3 times
+      why: needs the Docker daemon socket, which a sandbox cannot safely expose
+      e.g. docker compose up -d db
+  ✓ gh  needed 2 times
+      why: uses your GitHub token, which the sandbox keeps unreadable
+      e.g. gh pr create --fill
+
+  Always denied
+  reading: ~/.ssh, ~/.aws, ~/.gnupg, ~/.config/gcloud, ~/.azure, ~/.kube/config, ~/.docker/config.json, ~/.npmrc, ~/.pypirc, ~/.netrc, ~/.git-credentials, ~/.config/gh/hosts.yml, ~/.cargo/credentials.toml, ~/.terraform.d/credentials.tfrc.json, ~/Library/Keychains, ~/.password-store, ~/.local/share/keyrings, ./.env.local, ./.env, ./.env.*, ./*.pem, ./*.key, ./.envrc
+  writing: ~/.claude/settings.json, ~/.claude/settings.local.json, ./.claude/settings.json, ./.claude/settings.local.json, ~/.codex/config.toml, ~/.srt-settings.json, ~/.config/nono, ./.git/hooks, ~/.zshrc, ~/.bashrc, ~/.bash_profile, ~/.profile, ~/.zprofile
+

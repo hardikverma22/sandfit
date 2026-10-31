@@ -1,0 +1,27 @@
+
+sandfit 0.1.0  ·  read 243 tool calls from 12 sessions (Claude Code) · last 30 days
+  project ~/code/storefront
+
+  If you turn on the sandbox today
+  ███████░░░░░░░░░░░░░░░░░  28% of your shell commands would break  (69 of 243)
+
+  With the sandfit policy
+  ░░░░░░░░░░░░░░░░░░░░░░░░  0% would break  (0 of 49 commands from your newest 20% of history, which the policy never saw)
+  On the history it was built from: 0%
+  2 commands that read secrets are blocked on purpose
+  Manual approvals you would no longer need: 24 of 35
+  11 commands run outside the sandbox (tools that cannot work inside it)
+
+  What the policy allows
+  Network   api.github.com, api.vercel.com, binaries.prisma.sh, cdn.playwright.dev, files.pythonhosted.org, github.com +4 more
+  Writes    your project, temp, ~/.cache/ms-playwright, ~/.cache/pip, ~/.npm, ~/notes
+  Servers   local dev servers may listen on ports
+  Outside   docker, gh, git push run unsandboxed
+  Denied    secrets (~/.ssh, ~/.aws, .env …) and the agent's own config
+
+  Next
+  sandfit apply                    write it to .claude/settings.json (keeps a backup)
+  sandfit explain                  why each grant is there, with an example
+  sandfit emit --target policy     the full policy file to review
+  sandfit emit --target srt|codex|nono  for other sandboxes
+

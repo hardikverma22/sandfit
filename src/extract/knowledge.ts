@@ -80,6 +80,7 @@ export const KNOWLEDGE: Record<string, ToolKnowledge> = {
   ssh: { exclude: "needs your SSH keys, which the sandbox protects" },
   scp: { exclude: "needs your SSH keys, which the sandbox protects" },
   rsync: {},
+  prisma: { hosts: ["binaries.prisma.sh"], netSubcommands: ["generate", "migrate", "db", "init"], writes: ["~/.cache/prisma"], bindSubcommands: ["studio"] },
   ollama: { hosts: ["registry.ollama.ai"], netSubcommands: ["pull", "push", "run"], writes: ["~/.ollama"] },
   next: { bindSubcommands: ["dev", "start"] },
   vite: { bindSubcommands: ["", "dev", "preview", "serve"] },

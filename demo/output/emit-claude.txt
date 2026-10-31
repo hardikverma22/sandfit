@@ -1,0 +1,105 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "excludedCommands": [
+      "docker *",
+      "gh *",
+      "git push *"
+    ],
+    "network": {
+      "allowedDomains": [
+        "api.github.com",
+        "api.vercel.com",
+        "binaries.prisma.sh",
+        "cdn.playwright.dev",
+        "files.pythonhosted.org",
+        "github.com",
+        "playwright.download.prss.microsoft.com",
+        "pypi.org",
+        "registry.npmjs.org",
+        "vercel.com"
+      ],
+      "allowLocalBinding": true
+    },
+    "filesystem": {
+      "allowWrite": [
+        "~/.cache/ms-playwright",
+        "~/.cache/pip",
+        "~/.npm",
+        "~/notes"
+      ],
+      "denyRead": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.gnupg",
+        "~/.config/gcloud",
+        "~/.azure",
+        "~/.kube/config",
+        "~/.docker/config.json",
+        "~/.npmrc",
+        "~/.pypirc",
+        "~/.netrc",
+        "~/.git-credentials",
+        "~/.config/gh/hosts.yml",
+        "~/.cargo/credentials.toml",
+        "~/.terraform.d/credentials.tfrc.json",
+        "~/Library/Keychains",
+        "~/.password-store",
+        "~/.local/share/keyrings",
+        "./.env.local",
+        "./.env",
+        "./.envrc"
+      ],
+      "denyWrite": [
+        "~/.claude/settings.json",
+        "~/.claude/settings.local.json",
+        "./.claude/settings.json",
+        "./.claude/settings.local.json",
+        "~/.codex/config.toml",
+        "~/.srt-settings.json",
+        "~/.config/nono",
+        "./.git/hooks",
+        "~/.zshrc",
+        "~/.bashrc",
+        "~/.bash_profile",
+        "~/.profile",
+        "~/.zprofile"
+      ]
+    }
+  },
+  "permissions": {
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.kube/config)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.netrc)",
+      "Read(~/.git-credentials)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Read(~/.cargo/credentials.toml)",
+      "Read(~/.terraform.d/credentials.tfrc.json)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/.password-store/**)",
+      "Read(~/.local/share/keyrings/**)",
+      "Read(./.env.local)",
+      "Read(./.env)",
+      "Read(./.envrc)",
+      "Read(./.env.*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Edit(./.env.local)",
+      "Edit(./.env)",
+      "Edit(./.envrc)",
+      "Edit(./.env.*)",
+      "Edit(./**/*.pem)",
+      "Edit(./**/*.key)"
+    ]
+  }
+}

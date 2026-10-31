@@ -1,0 +1,134 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #term-window {
+      width: 1680px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 40px 120px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+    }
+    #term-bar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    #term-bar i {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #2c333d;
+    }
+    #term-bar span {
+      margin-left: 18px;
+      font-family: var(--font-mono);
+      font-size: 28px;
+      color: var(--dim);
+    }
+    #term-body {
+      padding: 34px 46px 40px;
+      font-family: var(--font-mono);
+      font-size: 29px;
+      line-height: 1.6;
+    }
+    #term-body > div {
+      white-space: pre;
+      min-height: 1.6em;
+    }
+    #term-prompt {
+      color: var(--ok);
+    }
+    #term-cmd span {
+      opacity: 0;
+    }
+    .t-line {
+      opacity: 0;
+    }
+    .t-dim {
+      color: var(--dim);
+    }
+    .t-bold {
+      font-weight: 700;
+    }
+    .t-bad {
+      color: var(--bad);
+      font-weight: 700;
+    }
+    .t-ok {
+      color: var(--ok);
+      font-weight: 700;
+    }
+    .t-warn {
+      color: var(--warn);
+    }
+    .t-cyan {
+      color: #6cc4ff;
+    }
+    .t-bar {
+      display: inline-block;
+      width: 480px;
+      height: 22px;
+      vertical-align: -3px;
+      margin-right: 22px;
+      background: #1f252d;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .t-bar b {
+      display: block;
+      height: 100%;
+      width: 100%;
+      transform-origin: left center;
+    }
+    #term-bar-bad b {
+      background: var(--bad);
+    }
+    #term-bar-ok b {
+      background: var(--ok);
+    }
+  </style>
+  <div id="root" data-composition-id="terminal" data-width="1920" data-height="1080">
+    <div id="term-window">
+      <div id="term-bar"><i></i><i></i><i></i><span>~/code/storefront</span></div>
+      <div id="term-body"><div><span id="term-prompt">$ </span><span id="term-cmd"><span>n</span><span>p</span><span>x</span><span> </span><span>s</span><span>a</span><span>n</span><span>d</span><span>f</span><span>i</span><span>t</span></span></div>
+<div class="t-line"><span class="t-bold">sandfit</span> <span class="t-dim">0.1.0  ·  read 243 tool calls from 12 sessions (Claude Code)</span></div>
+<div class="t-line"> </div>
+<div class="t-line"><span class="t-bold">  If you turn on the sandbox today</span></div>
+<div class="t-line">  <span class="t-bar" id="term-bar-bad"><b></b></span><span class="t-bad">28%</span> of your shell commands would break <span class="t-dim">(69 of 243)</span></div>
+<div class="t-line"> </div>
+<div class="t-line"><span class="t-bold">  With the sandfit policy</span></div>
+<div class="t-line">  <span class="t-bar" id="term-bar-ok"><b></b></span><span class="t-ok">0%</span> would break <span class="t-dim">(0 of 49 commands it never saw)</span></div>
+<div class="t-line">  <span class="t-warn">2</span> commands that read secrets are blocked <span class="t-dim">on purpose</span></div>
+<div class="t-line">  Manual approvals you would no longer need: <span class="t-bold">24</span> of 35</div>
+<div class="t-line"> </div>
+<div class="t-line">  <span class="t-cyan">Network </span>  api.github.com, api.vercel.com, github.com, pypi.org <span class="t-dim">+6 more</span></div>
+<div class="t-line">  <span class="t-cyan">Writes  </span>  your project, temp, ~/.npm, ~/.cache/pip, ~/notes <span class="t-dim">+1 more</span></div>
+<div class="t-line">  <span class="t-cyan">Outside </span>  docker, gh, git push <span class="t-dim">run unsandboxed</span></div></div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#term-window", { opacity: 0, scale: 0.96, filter: "blur(10px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.5, ease: "expo.out" }, 0);
+    // Typing: one character every 70 ms.
+    tl.fromTo("#term-cmd span", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.07 }, 0.55);
+    // Output arrives line by line once the command "runs".
+    tl.fromTo(".t-line", { opacity: 0 }, { opacity: 1, duration: 0.12, stagger: 0.09, ease: "none" }, 1.7);
+    // Bars fill to their real values (28% and 0%: the green bar stays empty on purpose).
+    tl.fromTo("#term-bar-bad b", { scaleX: 0 }, { scaleX: 0.28, duration: 0.7, ease: "expo.out" }, 2.1);
+    tl.fromTo("#term-bar-ok b", { scaleX: 0 }, { scaleX: 0, duration: 0.01 }, 2.4);
+    // Slow push toward the result, then leave.
+    tl.fromTo("#term-window", { y: 0 }, { y: -10, duration: 6, ease: "power1.inOut" }, 3);
+    tl.to("#term-window", { opacity: 0, scale: 0.98, filter: "blur(10px)", duration: 0.25, ease: "power3.in" }, 9.05);
+    window.__timelines["terminal"] = tl;
+  </script>
+</template>
