@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="demo/sandfit-demo.mp4"><img src="demo/sandfit-demo.gif" alt="sandfit demo: the sandbox would break 28% of commands today; with the sandfit policy, 0% of unseen commands break, secrets stay blocked" width="860"></a>
-  <br><sub><b><a href="demo/sandfit-demo.mp4">▶ Watch with sound (MP4, 29 s)</a></b> · made with <a href="https://github.com/heygen-com/hyperframes">HyperFrames</a> · the terminal shows real sandfit output on a <a href="demo/sample-history.ts">sample history</a></sub>
+  <br><sub><b><a href="demo/sandfit-demo.mp4">▶ Watch with sound (MP4, 29 s)</a></b>· the terminal shows real sandfit output on a <a href="demo/sample-history.ts">sample history</a></sub>
 </p>
 
 ## The problem, in one minute
