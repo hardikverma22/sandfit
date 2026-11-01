@@ -177,6 +177,7 @@ sandfit apply --review      # first keep or drop each grant your history needed 
 sandfit learn               # what a sandbox blocked in past sessions, as suggestions
 sandfit apply --learn       # first add the blocked things you recognise (Enter skips)
 sandfit drift -t <target>   # does your config still cover what your agent does? (exits 1 if not)
+sandfit score               # rate your Claude Code sandbox settings out of 100, with fixes
 ```
 
 `sandfit diff` lists every grant it would add and summarizes the protection rules (secret and
@@ -239,6 +240,49 @@ startup files, the agent's own config or broad folders. It only uses errors that
 path (for example `Read-only file system` on Linux, `Operation not permitted` on macOS, or a failed
 lookup that names the host, or Claude Code's own `deny network-outbound host` report). A blocked `curl`
 under plain sandbox-runtime only says `CONNECT tunnel failed`, so that teaches it nothing.
+
+## How safe is your setup? A score out of 100
+
+```bash
+npx sandfit score
+```
+
+```text
+sandfit score  95/100  grade A
+
+  ✓ Sandbox is on                   30/30  commands Claude runs are isolated from the rest of your machine
+  ✓ No way around it                10/10  a failing command cannot be retried outside the sandbox
+  ✓ Fails closed                      5/5  if the sandbox cannot start, commands are refused
+  ~ Network limited to known sites  10/15  8 sites allowed; other sites ask first (in auto mode the classifier answers)
+                                         fix: npx sandfit apply --user --strict-network
+  ✓ Credentials protected           20/20  all 3 credential files found are blocked from commands
+  ✓ Writes kept narrow              10/10  1 extra folder, none broad or sensitive
+  ✓ Little runs outside             10/10  2 run outside the sandbox: docker, git push
+```
+
+It rates the settings Claude Code would actually use for this project: your user, project, local
+and admin settings files, merged the way Claude Code merges them. Every lost point comes with the fix.
+
+| Check | Points | Full marks when |
+|---|---:|---|
+| Sandbox is on | 30 | `sandbox.enabled` is true. Nothing else counts without it |
+| No way around it | 10 | `allowUnsandboxedCommands` is false, so a failing command can't be retried outside |
+| Fails closed | 5 | `failIfUnavailable` is true, so commands are refused if the sandbox can't start |
+| Network limited | 15 | no `*` entry, and `strictAllowlist` is on in user settings (10 without it) |
+| Credentials protected | 20 | every credential file on this machine (`~/.ssh`, `~/.aws`, `.env`, keys…) is denied to commands |
+| Writes kept narrow | 10 | nothing writable is your home, credentials, shell startup files or the agent's own settings |
+| Little runs outside | 10 | no shell or interpreter in `excludedCommands`, and only a few tools |
+
+It also shows how many of your recent commands those settings would block. `--json` prints the
+result, and `--min 90` exits 1 below 90, for CI.
+
+**A badge for your README.** `sandfit score --badge` scores only the project's committed
+`.claude/settings.json`, which is what everyone who clones the repo gets, and prints a badge:
+
+[![agent sandbox: 95/100](https://img.shields.io/badge/agent%20sandbox-95%2F100-brightgreen)](https://github.com/hardikverma22/sandfit)
+
+The badge is a snapshot: run it again when your settings change. Settings honoured only in user
+settings (like strict network) can't be in a project's badge, so a project's best is 95.
 
 ## Get told when your rules fall behind
 

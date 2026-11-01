@@ -341,6 +341,43 @@ describe("drift", () => {
   });
 });
 
+describe("score", () => {
+  const clean = () => rmSync(join(project, ".claude"), { recursive: true, force: true });
+
+  it("is 0/100 with no settings, and goes to an A after apply, with the fit from history", () => {
+    clean();
+    const before = sandfit(["score"]);
+    expect(before.code).toBe(0);
+    expect(before.out).toContain("0/100  grade F");
+    expect(sandfit(["apply", "-y"]).code).toBe(0);
+    const after = sandfit(["score"]);
+    expect(after.out).toMatch(/9\d\/100  grade A/);
+    expect(after.out).toContain("Fit: these settings would block");
+    clean();
+  });
+
+  it("--json, --min for CI, and --badge from the committed settings only", () => {
+    clean();
+    expect(sandfit(["apply", "-y"]).code).toBe(0);
+    const j = JSON.parse(sandfit(["score", "--json"]).out);
+    expect(j.checks).toHaveLength(7);
+    expect(j.total).toBe(j.checks.reduce((n: number, c: any) => n + c.points, 0));
+    expect(j.badge).toContain("img.shields.io/badge/agent%20sandbox-");
+    expect(sandfit(["score", "--min", "50"]).code).toBe(0);
+    expect(sandfit(["score", "--min", "101"]).code).toBe(1);
+    // Personal settings never count toward a project's badge.
+    mkdirSync(join(home, ".claude"), { recursive: true });
+    writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ sandbox: { network: { strictAllowlist: true } } }));
+    const full = JSON.parse(sandfit(["score", "--json"]).out).total;
+    const badge = sandfit(["score", "--badge"]);
+    expect(badge.out).toContain("committed settings only");
+    expect(badge.out).toMatch(new RegExp(`agent sandbox: ${full - 5}/100`));
+    rmSync(join(home, ".claude", "settings.json"));
+    clean();
+    expect(sandfit(["score", "--badge"]).out).toContain("has no .claude/settings.json yet");
+  });
+});
+
 describe("learn", () => {
   let learnProject: string;
   beforeAll(() => {
