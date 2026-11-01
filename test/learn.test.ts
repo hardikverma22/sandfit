@@ -5,7 +5,7 @@ import { analyze } from "../src/extract/extract.js";
 import { findBlocks } from "../src/ingest/blocks.js";
 import { parseClaudeTranscript } from "../src/ingest/claude.js";
 import { parseCodexTranscript } from "../src/ingest/codex.js";
-import { addToPolicy, learnSuggestions } from "../src/learn.js";
+import { addToPolicy, learnSuggestions, lineMentioning } from "../src/learn.js";
 import { buildPolicy } from "../src/policy/build.js";
 import type { AgentEvent } from "../src/types.js";
 import { bashEvent, tempHome, writeClaudeTranscript } from "./helpers.js";
@@ -128,5 +128,15 @@ describe("learnSuggestions", () => {
     expect(p.network.allowDomains).toContain("api.acme.dev");
     expect(p.filesystem.allowWrite).not.toContain("~/.cache/tool");
     expect(p.evidence["net:api.acme.dev"]?.example).toContain("blocked by the sandbox");
+  });
+});
+
+describe("learn examples", () => {
+  it("show the line of a multi-line call that hit the block", () => {
+    const call = "cd /Users/me/app\necho '## probe'\nmkdir -p ~/.cache/probe && touch ~/.cache/probe/x\ncurl -s https://api.acme.dev";
+    expect(lineMentioning(call, ["api.acme.dev"])).toBe("curl -s https://api.acme.dev");
+    expect(lineMentioning(call, ["/Users/me/.cache/probe", "~/.cache/probe", "probe"])).toBe("mkdir -p ~/.cache/probe && touch ~/.cache/probe/x");
+    expect(lineMentioning("npm test", ["x"])).toBe("npm test");
+    expect(lineMentioning("a\nb", ["zzz"])).toBe("a\nb");
   });
 });

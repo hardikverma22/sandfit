@@ -19,6 +19,16 @@
   commands seen in history did, so the first `git fetch` failed because the sandbox protects
   `~/.ssh`. Found by testing on a real Mac. HTTPS remotes are unchanged: fetch works inside the
   sandbox there.
+- The forecast follows Claude Code's rule for commands that run outside the sandbox: the whole call
+  must be excluded commands, with no `cd`, redirect to a file or `$(...)`. `cd repo && git push` or
+  `git push 2>&1 | tail -1` stays sandboxed, and is now shown as blocked with the reason, instead
+  of counted as fine. Found on a real Mac, where `git fetch` failed this way.
+- Exclusions are written the way the command was typed (`sudo apt *`, not `apt *`), because Claude
+  Code matches the text of the call.
+- Writes to the agents' own folders (`~/.claude`, `~/.codex`, for example Claude's memory files) are
+  never granted to commands or suggested by `learn`: a command that can write there can change what
+  the agent does next.
+- `learn` shows the line of a multi-line call that hit the block, not the whole call.
 
 ## 0.4.0 (2026-10-31)
 

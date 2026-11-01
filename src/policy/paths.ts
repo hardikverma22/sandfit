@@ -72,6 +72,16 @@ export function isSelfProtected(p: string, home: string, projects: string[]): bo
   return false;
 }
 
+/**
+ * The agents' own state: settings, memory, commands, skills, session history. A sandboxed command
+ * that can write here can change what the agent reads or does next, so sandfit never grants it to
+ * commands. (Sandboxes that wrap the whole agent, like srt and nono, still let the agent itself
+ * write there.)
+ */
+export function isAgentState(p: string, home: string): boolean {
+  return ["~/.claude", "~/.claude.json", "~/.codex"].some((d) => isInside(p, expandHome(d, home)));
+}
+
 /** Cache directories from the knowledge base, expanded. */
 function cacheRoots(home: string): string[] {
   const out = new Set<string>();

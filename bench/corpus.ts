@@ -186,7 +186,7 @@ export const CORPUS: Case[] = [
   { cmd: "gcloud run deploy api --source .", expect: ["exec:gcloud"], optional: ["net:googleapis.com"] },
   { cmd: "kubectl get pods -n prod", expect: ["exec:kubectl"], optional: ["write:~/.kube"] },
   { cmd: "apt-get install -y jq", expect: ["exec:apt-get"] },
-  { cmd: "sudo apt install -y ripgrep", expect: ["exec:apt"] },
+  { cmd: "sudo apt install -y ripgrep", expect: ["exec:sudo apt"] },
 
   // Hosted platforms and other tools
   { cmd: "wrangler deploy", expect: ["net:api.cloudflare.com"], optional: ["net:dash.cloudflare.com"] },
