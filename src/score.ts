@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import pc from "picocolors";
 import { expandHome } from "./extract/extract.js";
-import { SECRET_PATHS } from "./extract/knowledge.js";
+import { KNOWLEDGE, SECRET_PATHS } from "./extract/knowledge.js";
 import { findProjectSecrets } from "./policy/build.js";
 import { isAgentState, isInside, tildify, tooBroad } from "./policy/paths.js";
 import { plural } from "./report.js";
@@ -203,9 +203,14 @@ export function scoreClaude(files: SettingsFile[], ctx: ScoreContext): Score {
   else {
     const points = Math.round((20 * (ctx.secrets.length - exposed.length)) / ctx.secrets.length);
     const shown = exposed.slice(0, 4).map((p) => tildify(p, home)).join(", ") + (exposed.length > 4 ? `, +${exposed.length - 4} more` : "");
+    // Files a tool reads on every run (npm and ~/.npmrc) stay readable after apply too, so apply is no fix for them.
+    const toolRead = new Set(Object.values(KNOWLEDGE).flatMap((k) => k.readsSecrets ?? []).map((p) => expandHome(p, home)));
+    const fix = exposed.some((p) => !toolRead.has(p))
+      ? "npx sandfit apply"
+      : `your tools read ${exposed.length === 1 ? "this file" : "these files"} on every run, so the sandbox has to allow it: keep tokens out of ${exposed.length === 1 ? "it" : "them"} (use environment variables instead)`;
     checks.push(
       exposed.length
-        ? { id: "secrets", label: "Credentials protected", points, max: 20, status: points ? "partial" : "fail", detail: `${exposed.length} of ${ctx.secrets.length} credential files readable by commands: ${shown}`, fix: "npx sandfit apply" }
+        ? { id: "secrets", label: "Credentials protected", points, max: 20, status: points ? "partial" : "fail", detail: `${exposed.length} of ${ctx.secrets.length} credential files readable by commands: ${shown}`, fix }
         : { id: "secrets", label: "Credentials protected", points: 20, max: 20, status: "ok", detail: `all ${ctx.secrets.length} credential files found are blocked from commands` },
     );
   }
@@ -252,7 +257,7 @@ export function badgeMarkdown(score: Score): string {
   return `[![agent sandbox: ${score.total}/100](${url})](https://github.com/hardikverma22/sandfit)`;
 }
 
-export function renderScore(score: Score, opts: { home: string; fit?: { blocked: number; total: number }; projectOnly?: boolean }): string {
+export function renderScore(score: Score, opts: { home: string; fit?: { blocked: number; secrets?: number; total: number }; projectOnly?: boolean }): string {
   const color = score.grade === "A" || score.grade === "B" ? pc.green : score.grade === "C" ? pc.yellow : pc.red;
   const out = ["", `${pc.bold("sandfit score")}  ${color(pc.bold(`${score.total}/100`))}  ${color(`grade ${score.grade}`)}  ${pc.dim(opts.projectOnly ? "(the project's committed settings only)" : "(Claude Code sandbox, as your settings apply to this project)")}`, ""];
   for (const c of score.checks) {
@@ -263,7 +268,9 @@ export function renderScore(score: Score, opts: { home: string; fit?: { blocked:
   out.push("");
   if (opts.fit && opts.fit.total > 0) {
     const pct = (100 * opts.fit.blocked) / opts.fit.total;
-    out.push(`  ${pc.dim("Fit:")} these settings would block ${pct < 10 ? pct.toFixed(1) : Math.round(pct)}% of your recent commands (${opts.fit.blocked} of ${opts.fit.total}). ${pc.dim("sandfit forecast shows which.")}`);
+    // Same count as sandfit apply and forecast: secret reads are blocked on purpose, not broken.
+    const secrets = opts.fit.secrets ? `, plus ${opts.fit.secrets} blocked on purpose for reading secrets` : "";
+    out.push(`  ${pc.dim("Fit:")} these settings would break ${pct < 10 ? pct.toFixed(1) : Math.round(pct)}% of your recent commands (${opts.fit.blocked} of ${opts.fit.total}${secrets}). ${pc.dim("sandfit forecast shows which.")}`);
   }
   out.push(pc.dim(`  Read from: ${score.files.length ? score.files.map((f) => tildify(f, opts.home)).join(", ") : "no Claude Code settings files"}`));
   out.push(pc.dim("  Badge for your README: sandfit score --badge"), "");

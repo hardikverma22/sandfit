@@ -91,7 +91,9 @@ export function buildPolicy(analyzed: AnalyzedEvent[], opts: BuildOptions = {}):
       switch (n.kind) {
         case "write": {
           if (isSecret(n.value, home) || isSelfProtected(n.value, home, projects)) continue;
-          if (n.via === "shell" && isAgentState(n.value, home)) continue;
+          // The agents' own state is never granted, whichever tool wrote there: a sandbox like Codex
+          // applies writable roots to commands too.
+          if (isAgentState(n.value, home)) continue;
           const g = generalizeWrite(n.value, home, projects);
           if (!g) continue;
           const key = tildify(g, home);

@@ -98,6 +98,7 @@ describe("option checking", () => {
     [["--holdout", "1.5"], "--holdout"],
     [["--min-count", "0"], "--min-count"],
     [["emit", "-t", "docker"], "--target"],
+    [["scroe"], "unknown command 'scroe'"],
   ])("rejects %j", (args, flag) => {
     const r = sandfit(args);
     expect(r.code).not.toBe(0);
@@ -122,6 +123,16 @@ describe("option checking", () => {
     expect(s.sandbox.credentials.envVars).toContainEqual({ name: "NPM_TOKEN", mode: "mask", injectHosts: ["registry.npmjs.org"] });
     // The literal token in history is never written anywhere.
     expect(JSON.stringify(s)).not.toContain(FAKE_TOKEN);
+  });
+
+  // Seen on a real Mac: --all dropped --project, then the error said to pass --project.
+  it("--all --project uses every project's history for the one project named", () => {
+    const other = join(home, "other");
+    mkdirSync(join(other, ".git"), { recursive: true });
+    const r = sandfit(["diff", "--all", "--project", other], { cwd: home });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain(join(other, ".claude", "settings.json"));
+    expect(r.out).toContain("registry.npmjs.org");
   });
 
   it("refuses a project that is really the home folder", () => {
@@ -352,7 +363,7 @@ describe("score", () => {
     expect(sandfit(["apply", "-y"]).code).toBe(0);
     const after = sandfit(["score"]);
     expect(after.out).toMatch(/9\d\/100  grade A/);
-    expect(after.out).toContain("Fit: these settings would block");
+    expect(after.out).toContain("Fit: these settings would break");
     clean();
   });
 

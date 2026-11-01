@@ -45,6 +45,11 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   let project = opts.all ? undefined : (opts.project ? resolve(opts.project) : cwdIsProject ? cwdRoot : undefined);
   let ing = await ingest({ harnesses: opts.harness, claudeDir: opts.claudeDir, codexDir: opts.codexDir, project, days: opts.days });
   let scopeLabel = project ? `project ${tildify(project, home)}` : cwdIsProject || opts.all ? "all projects" : `all projects (${tildify(cwdRoot, home)} is not a project folder; run inside a project to scope it)`;
+  // --all --project: every project's history, applied to the one project named.
+  if (opts.all && opts.project) {
+    project = resolve(opts.project);
+    scopeLabel = `all projects, for ${tildify(project, home)}`;
+  }
   if (project && ing.events.length === 0 && !opts.project) {
     project = undefined;
     ing = await ingest({ harnesses: opts.harness, claudeDir: opts.claudeDir, codexDir: opts.codexDir, days: opts.days });

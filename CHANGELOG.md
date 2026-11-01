@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The agents' own folders (`~/.claude`, `~/.codex`) are no longer granted when the agent's file tools
+  wrote there. Before, Claude's memory files could end up in Codex's `writable_roots` and in
+  `explain`. `forecast` now says such writes are protected on purpose instead of suggesting
+  `allowWrite` for them.
+- `sandfit score` no longer suggests `sandfit apply` for credential files your tools read on every
+  run (like `~/.npmrc`), since apply leaves those readable on purpose. It suggests keeping tokens out
+  of them instead.
+- `sandfit score` counts broken commands the way `apply` and `forecast` do. Secret reads are listed
+  as blocked on purpose rather than counted as broken.
+- `--all --project <dir>` uses every project's history for the named project. Before, `--all`
+  ignored `--project`.
+- A mistyped command (`sandfit scroe`) is an error instead of running the summary.
+
 ## 0.6.0 (2026-11-01)
 
 ### Added

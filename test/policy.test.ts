@@ -186,4 +186,13 @@ describe("the agent's own state", () => {
     const policy = buildPolicy(analyze(writes.map((w, i) => bashEvent(`echo hi > ${w}`, project, { id: String(i) })), { home }), { home, projects: [project] });
     expect(policy.filesystem.allowWrite.filter((w) => w.includes(".claude") || w.includes(".codex"))).toEqual([]);
   });
+
+  // Seen on a real Mac: Claude's memory, written with its own Write tool, reached Codex's writable_roots.
+  it("is not granted when the agent's file tools wrote there either", () => {
+    const memory = join(home, ".claude/projects/x/memory/notes.md");
+    const ev = { ...bashEvent("write", project), tool: "write" as const, toolName: "Write", command: undefined, paths: [memory] };
+    const policy = buildPolicy(analyze([ev], { home }), { home, projects: [project] });
+    expect(policy.harnessTools.allowWrite).toEqual([]);
+    expect(Object.keys(policy.evidence).filter((k) => k.includes(".claude"))).toEqual([]);
+  });
 });
