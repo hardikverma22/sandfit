@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 (2026-11-01)
 
 ### Fixed
 - The agents' own folders (`~/.claude`, `~/.codex`) are no longer granted when the agent's file tools

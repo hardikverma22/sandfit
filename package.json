@@ -1,6 +1,6 @@
 {
   "name": "sandfit",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Turn on your coding agent's sandbox without breaking your workflow. sandfit reads your Claude Code and Codex history and writes a least-privilege sandbox policy that fits how you actually work.",
   "type": "module",
   "bin": {
