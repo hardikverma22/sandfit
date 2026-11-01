@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="sandfit logo">
+  <rect width="256" height="256" rx="56" fill="#14110f"/>
+  <!-- the sandbox: a boundary drawn exactly around what the agent needs -->
+  <rect x="40" y="40" width="176" height="176" rx="28" fill="none" stroke="#e9b872" stroke-width="10" stroke-dasharray="22 14" stroke-linecap="round"/>
+  <!-- the agent's prompt, fitting inside -->
+  <path d="M84 100 L120 128 L84 156" fill="none" stroke="#f5efe6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="134" y="146" width="44" height="14" rx="7" fill="#e9b872"/>
+</svg>
