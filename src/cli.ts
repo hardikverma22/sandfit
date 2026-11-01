@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Command, InvalidArgumentError, Option } from "commander";
 import pc from "picocolors";
@@ -10,6 +10,8 @@ import { mergeSettings, toClaudeSettings } from "./emit/claude.js";
 import { toCodexToml, toNonoProfile, toOpenShellPolicy, toPolicyYaml, toSrtSettings } from "./emit/others.js";
 import { diffConfig, unusedEntries } from "./diff.js";
 import { computeDrift, driftLine, renderDrift } from "./drift.js";
+import { gitRoot } from "./policy/paths.js";
+import { badgeMarkdown, existingSecrets, loadClaudeSettings, renderScore, scoreClaude } from "./score.js";
 import { forecast, modelFromPolicy } from "./forecast.js";
 import { plural, renderBlockers, renderChanges, renderDiff, renderExplain, renderLearn, renderSummary } from "./report.js";
 import { addToPolicy, learnSuggestions } from "./learn.js";
@@ -347,6 +349,31 @@ targetOptions(common(program.command("drift").description("check that your sandb
       if (o.hook) return;
       throw e;
     }
+  });
+
+common(program.command("score").description("rate your Claude Code sandbox settings out of 100, with the fix for every lost point"))
+  .option("--json", "print machine-readable results")
+  .option("--badge", "print a README badge for the project's committed settings (.claude/settings.json)")
+  .option("--min <n>", "exit 1 if the score is below N (for CI)", intArg(0))
+  .action(async (o) => {
+    const home = homedir();
+    const project = o.project ? resolve(o.project) : (gitRoot(process.cwd()) ?? process.cwd());
+    // A badge describes what the repository ships, so it ignores personal and machine settings.
+    const projectOnly = !!o.badge;
+    const files = loadClaudeSettings(project, home, { projectOnly });
+    const score = scoreClaude(files, { project, home, secrets: existingSecrets(project, home) });
+    let fit: { blocked: number; total: number } | undefined;
+    if (!projectOnly && !o.json) {
+      const r = await run({ ...runOpts({ ...o, project }), holdout: 0 });
+      if (r.withPolicy.shellCalls > 0 && score.checks[0]!.status === "ok") fit = { blocked: r.baseline.blockedCalls, total: r.baseline.shellCalls };
+    }
+    if (o.json) console.log(JSON.stringify({ project, projectOnly, ...score, badge: badgeMarkdown(score) }, null, 2));
+    else if (o.badge) {
+      console.log(renderScore(score, { home, projectOnly }));
+      console.log(`  Add this to your README:\n\n  ${badgeMarkdown(score)}\n`);
+      if (!files.length) console.log(pc.dim("  This project has no .claude/settings.json yet. Commit one (npx sandfit apply) so everyone who clones it gets the sandbox.\n"));
+    } else console.log(renderScore(score, { home, fit }));
+    if (o.min !== undefined && score.total < o.min) process.exitCode = 1;
   });
 
 targetOptions(common(program.command("apply").description("write the policy into your sandbox's config (shows the changes, asks first, keeps a backup)")))

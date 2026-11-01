@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `sandfit score`: rates the Claude Code sandbox settings that apply to a project out of 100, with
+  the fix for every lost point. Seven checks: sandbox on, no unsandboxed retry, fails closed,
+  network limited, credentials on this machine denied, writes kept narrow, little running outside.
+  It merges user, project, local and managed settings the way Claude Code does, reads both path
+  conventions (sandbox paths and permission rules), and shows how many recent commands the settings
+  would block. `--json`, and `--min <n>` to fail CI below a score.
+- `sandfit score --badge`: a README badge for the project's committed settings.
+
 ## 0.5.0 (2026-11-01)
 
 ### Added
