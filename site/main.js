@@ -35,8 +35,8 @@
   document.querySelectorAll("[data-install]").forEach((box) => {
     const tabs = [...box.querySelectorAll('[role="tab"]')];
     if (!tabs.length) return;
-    const what = box.querySelector("[data-what]");
-    const cmd = box.querySelector("[data-cmd-text]");
+    const what = box.querySelector("#cmd-panel [data-what]");
+    const cmd = box.querySelector("#cmd-panel [data-cmd-text]");
     const copy = box.querySelector("#cmd-panel [data-copy]");
     const select = (tab, focus) => {
       tabs.forEach((t) => {

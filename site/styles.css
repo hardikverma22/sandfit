@@ -98,8 +98,7 @@ code, kbd, pre { font-family: var(--mono); }
 .install__what { display: block; color: var(--chalk-dim); font-size: 0.85rem; margin-bottom: 0.15rem; }
 .install code { font-size: 0.98rem; color: var(--chalk); word-break: break-word; }
 .install code::before { content: "$ "; color: var(--tape); }
-.tabs { display: flex; gap: 0.25rem; padding: 0.55rem 0.6rem 0; overflow-x: auto; scrollbar-width: none; border-top: 1px solid rgba(236, 232, 220, 0.08); }
-.tabs::-webkit-scrollbar { display: none; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.55rem 0.6rem 0; border-top: 1px solid rgba(236, 232, 220, 0.08); }
 .tab { flex: none; font: 400 0.86rem/1 var(--body); color: var(--chalk-dim); background: none; border: 0; padding: 0.55rem 0.7rem; border-radius: 8px; cursor: pointer; }
 .tab:hover { color: var(--chalk); }
 .tab[aria-selected="true"] { color: var(--mat-deep); background: var(--tape); font-weight: 700; }
