@@ -103,7 +103,8 @@ const program = new Command()
 
 common(program)
   .option("--json", "print machine-readable results")
-  .action(async (o) => {
+  .action(async (o, cmd: Command) => {
+    if (cmd.args.length) program.error(`error: unknown command '${cmd.args[0]}'. See sandfit --help.`);
     const r = await run(runOpts(o));
     if (o.json) {
       console.log(
@@ -265,7 +266,7 @@ function checkApplicable(target: Target, r: Awaited<ReturnType<typeof run>>, o: 
     return false;
   }
   if (target === "claude" && !o.user && r.projects.length !== 1) {
-    console.error(pc.yellow(`sandfit: this history spans ${r.projects.length} projects. Run it inside one project (or pass --project), or use --user for your user settings.`));
+    console.error(pc.yellow(`sandfit: this history (${r.scopeLabel}) spans ${r.projects.length} projects. Run it inside one project, pass --project <dir> (add --all to use every project's history for it), or use --user for your user settings.`));
     process.exitCode = 1;
     return false;
   }
@@ -362,10 +363,10 @@ common(program.command("score").description("rate your Claude Code sandbox setti
     const projectOnly = !!o.badge;
     const files = loadClaudeSettings(project, home, { projectOnly });
     const score = scoreClaude(files, { project, home, secrets: existingSecrets(project, home) });
-    let fit: { blocked: number; total: number } | undefined;
+    let fit: { blocked: number; secrets: number; total: number } | undefined;
     if (!projectOnly && !o.json) {
       const r = await run({ ...runOpts({ ...o, project }), holdout: 0 });
-      if (r.withPolicy.shellCalls > 0 && score.checks[0]!.status === "ok") fit = { blocked: r.baseline.blockedCalls, total: r.baseline.shellCalls };
+      if (r.withPolicy.shellCalls > 0 && score.checks[0]!.status === "ok") fit = { blocked: r.baseline.blockedCalls - r.baseline.secretCalls, secrets: r.baseline.secretCalls, total: r.baseline.shellCalls };
     }
     if (o.json) console.log(JSON.stringify({ project, projectOnly, ...score, badge: badgeMarkdown(score) }, null, 2));
     else if (o.badge) {

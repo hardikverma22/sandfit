@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { expandHome } from "./extract/extract.js";
 import { parseShell } from "./extract/shell.js";
-import { generalizeWrite, isInside, tempRoots, tildify, tooBroad } from "./policy/paths.js";
+import { generalizeWrite, isAgentState, isInside, tempRoots, tildify, tooBroad } from "./policy/paths.js";
 import { redact } from "./redact.js";
 import type { AnalyzedEvent, Policy } from "./types.js";
 
@@ -171,7 +171,9 @@ export function forecast(analyzed: AnalyzedEvent[], model: SandboxModel, home = 
         if (denied || !allowed) {
           blocked = true;
           if (denied) hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (agent config, git hooks/config or shell startup file); run it yourself outside the agent", example);
-          else if (tooBroad(n.value, home)) {
+          else if (isAgentState(n.value, home)) {
+            hit(`write-protected:${tildify(n.value, home)}`, "secret", "protected on purpose (the agent's own settings, memory and history); let the agent's file tools write there, or run it yourself", example);
+          } else if (tooBroad(n.value, home)) {
             hit(`write:${tildify(n.value, home)}`, "write", "sandfit never grants this whole folder; have the agent write somewhere narrower", example);
           } else {
             const g = generalizeWrite(n.value, home, projects) ?? n.value;

@@ -124,6 +124,16 @@ describe("score: credentials", () => {
     expect(c.points).toBe(5);
     expect(c.status).toBe("partial");
     expect(c.detail).toBe("3 of 4 credential files readable by commands: ~/.aws, ~/app/.env, ~/app/certs/server.pem");
+    expect(c.fix).toBe("npx sandfit apply");
+  });
+
+  // Seen on a real Mac: the fix said "npx sandfit apply", which leaves ~/.npmrc readable on purpose.
+  it("does not send you to apply for a file your tools read on every run", () => {
+    const npmrc = join(home, ".npmrc");
+    const c = scoreClaude([file(GOOD)], { project, home, secrets: [SSH, npmrc] }).checks.find((x) => x.id === "secrets")!;
+    expect(c.detail).toContain("~/.npmrc");
+    expect(c.fix).not.toContain("sandfit apply");
+    expect(c.fix).toContain("keep tokens out of it");
   });
 
   it("reads both path conventions: //abs and ./ in permission rules, /abs and ~ in sandbox paths", () => {
@@ -273,11 +283,11 @@ describe("output", () => {
   });
 
   it("the report shows every check, the fix for lost points, the fit and where it read from", () => {
-    const text = plain(renderScore(score(file(GOOD)), { home, fit: { blocked: 3, total: 120 } }));
+    const text = plain(renderScore(score(file(GOOD)), { home, fit: { blocked: 3, secrets: 2, total: 120 } }));
     expect(text).toContain("95/100  grade A");
     expect(text).toContain("~ Network limited to known sites  10/15");
     expect(text).toContain("fix: npx sandfit apply --user --strict-network");
-    expect(text).toContain("would block 2.5% of your recent commands (3 of 120)");
+    expect(text).toContain("would break 2.5% of your recent commands (3 of 120, plus 2 blocked on purpose for reading secrets)");
     expect(text).toContain("Read from: ~/app/.claude/settings.json");
     expect(plain(renderScore(score(), { home }))).toContain("Read from: no Claude Code settings files");
   });
