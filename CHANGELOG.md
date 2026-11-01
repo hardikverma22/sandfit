@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-11-01)
 
 ### Added
 - `sandfit score`: rates the Claude Code sandbox settings that apply to a project out of 100, with
