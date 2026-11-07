@@ -37,6 +37,15 @@ describe("analyze", () => {
     expect(gitUrlHost("git@gitlab.com:a/b.git")).toBe("gitlab.com");
   });
 
+  it("git clone writes the folder git creates, not a path built from the URL", () => {
+    const writes = (c: string) => needsOf(c).filter((x) => x.startsWith("write:"));
+    const cwd = "/w/app";
+    expect(writes("git clone https://github.com/owner/repo")).toEqual([`write:${cwd}/repo`]);
+    expect(writes("git clone https://github.com/owner/repo.git")).toEqual([`write:${cwd}/repo`]);
+    expect(writes("git clone git@github.com:owner/repo.git")).toEqual([`write:${cwd}/repo`]);
+    expect(writes("git clone https://github.com/owner/repo mydir")).toEqual([`write:${cwd}/mydir`]);
+  });
+
   it("treats curl to localhost as a local server, not network", () => {
     expect(needsOf("curl -s http://localhost:3000/health")).toEqual(["bind:localhost"]);
     expect(needsOf("curl -sSL https://api.example.com/v1 -o out.json")).toEqual(["write:/w/app/out.json", "net:api.example.com"]);

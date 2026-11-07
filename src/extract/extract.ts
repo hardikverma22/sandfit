@@ -230,7 +230,13 @@ function shellNeeds(
       const sshRemote = urlArgs.some((a) => /^[\w.-]+@[\w.-]+:|^ssh:\/\//.test(a)) || (urlArgs.length === 0 && gitUsesSsh(cmd.cwd));
       if (sshRemote) needs.push({ kind: "exec", value: `${invoked} ${sub}`, reason: SSH_GIT_REASON, via: "shell" });
       else if (sub === "push") needs.push({ kind: "exec", value: `${invoked} push`, reason: "needs your git credentials (keychain or a token), which the sandbox protects", via: "shell" });
-      if (sub === "clone" && positional.length >= 2) needs.push({ kind: "write", value: abs(positional[positional.length - 1]!), reason: "git clone", via: "shell" });
+      if (sub === "clone") {
+        // Drop "clone" itself; with an explicit directory it is the last of two remaining args,
+        // otherwise git creates a folder named after the last URL segment minus ".git".
+        const rest = positional.slice(1);
+        const dest = rest.length >= 2 ? rest[rest.length - 1]! : rest[0] ? cloneDirName(rest[0]) : "";
+        if (dest) needs.push({ kind: "write", value: abs(dest), reason: "git clone", via: "shell" });
+      }
     }
     return;
   }
@@ -524,4 +530,10 @@ export function secretEnvRefs(command: string): string[] {
   const out = new Set<string>();
   for (const m of command.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g)) if (SECRET_ENV.test(m[1]!)) out.add(m[1]!);
   return [...out];
+}
+
+/** The folder `git clone <repo>` creates: last path segment, minus a trailing slash and ".git". */
+function cloneDirName(repo: string): string {
+  const seg = repo.replace(/[\\/]+$/, "").split(/[\\/:]/).pop() ?? "";
+  return seg.replace(/\.git$/, "");
 }
